@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Allow major AI crawlers
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# Sitemaps
+Sitemap: https://fixrez-han4cbj05-kevin046s-projects.vercel.app/sitemap.xml
