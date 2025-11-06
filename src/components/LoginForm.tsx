@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import { isVerified } from '@/lib/auth'
 
 interface LoginFormProps {
-  onToggle: () => void
+  onToggle?: () => void
 }
 
 export default function LoginForm({ onToggle }: LoginFormProps) {
@@ -42,8 +43,14 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
         throw new Error('Login failed. Please try again.')
       }
       setUser(data.user)
-      // Redirect to Home after successful login
-      // Use full navigation to avoid any SPA routing edge cases
+
+      // If not verified, send to Verify page and stop
+      if (!isVerified(data.user)) {
+        window.location.assign('/verify')
+        return
+      }
+
+      // Verified → go Home
       window.location.assign('/')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'An error occurred'
@@ -80,16 +87,19 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
           <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="email">
             Email
           </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="your@email.com"
-            aria-describedby="login-error"
-            required
-          />
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 pl-10 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="your@email.com"
+              aria-describedby="login-error"
+              required
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -97,12 +107,13 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
             Password
           </label>
           <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               id="password"
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-3 pl-10 pr-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="••••••••"
               aria-required="true"
               aria-describedby="login-error"
@@ -123,14 +134,14 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-3 rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          className="w-full py-3 rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition inline-flex items-center justify-center"
         >
-          {loading ? 'Signing In...' : 'Sign In'}
+          {loading && <Loader2 className="w-4 h-4 animate-spin" />} {loading ? 'Signing In...' : 'Sign In'}
         </button>
 
         <button
           type="button"
-          onClick={onToggle}
+          onClick={() => onToggle?.()}
           className="w-full py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition"
         >
           Need an account? Register

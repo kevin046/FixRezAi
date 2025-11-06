@@ -36,6 +36,7 @@ const logos = [
 
 import { User } from '@supabase/supabase-js'
 import { useAuthStore } from '@/stores/authStore'
+import { isVerified } from '@/lib/auth'
 
 interface HeroProps {
   onGetStarted: () => void
@@ -46,6 +47,7 @@ interface HeroProps {
 export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
   const [resumesProcessed, setResumesProcessed] = useState(0)
   const [logoutStatus, setLogoutStatus] = useState<'success' | 'error' | null>(null)
+  const verified = user ? isVerified(user) : false
 
   useEffect(() => {
     const getInitialCount = () => {
@@ -112,6 +114,10 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
                 <>
                   <span className="text-gray-700 dark:text-gray-300">
                     Welcome, {user.email?.split('@')[0]}
+                  </span>
+                  {/* Verification badge */}
+                  <span className={`px-2 py-1 text-xs rounded-full border ${verified ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>
+                    {verified ? 'Verified' : 'Not Verified'}
                   </span>
                   <a
                     href="/settings"

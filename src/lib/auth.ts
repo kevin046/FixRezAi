@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { useAuthStore } from '@/stores/authStore'
 
 export function isVerified(user: User | null): boolean {
-  return !!user?.email_confirmed_at
+  return !!(user?.email_confirmed_at || (user as any)?.user_metadata?.verified)
 }
 
 const RESEND_KEY = 'fixrez_resend_verification_at'
@@ -22,7 +22,11 @@ export async function resendVerification(email: string): Promise<{ success: bool
       return { success: false, message: `Please wait ${seconds}s before requesting again.` }
     }
 
-    const { error } = await supabase.auth.resend({ type: 'signup', email })
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/verify` }
+    })
     if (error) {
       return { success: false, message: error.message }
     }
@@ -31,6 +35,22 @@ export async function resendVerification(email: string): Promise<{ success: bool
     return { success: true, message: 'Verification email sent. Check your inbox.' }
   } catch (e) {
     return { success: false, message: e instanceof Error ? e.message : 'Failed to resend verification email.' }
+  }
+}
+
+export async function syncVerifiedMetadata(): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user && user.email_confirmed_at) {
+      // Write a simple metadata flag for client/server checks
+      try { await supabase.auth.updateUser({ data: { verified: true } }) } catch {}
+      // Also upsert into profiles table for server-side checks
+      try {
+        await supabase.from('profiles').upsert({ id: user.id, verified: true, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+      } catch {}
+    }
+  } catch (e) {
+    console.warn('syncVerifiedMetadata error:', e)
   }
 }
 

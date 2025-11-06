@@ -1,4 +1,5 @@
 import { OptimizationRequest, OptimizationResponse } from '@/types/resume';
+import { supabase } from '@/lib/supabase'
 
 const OPTIMIZATION_PROMPT = `
 You are a world-class resume writer and career coach with a deep understanding of Applicant Tracking Systems (ATS). Your mission is to transform a user's resume into a powerful, professional, and ATS-optimized document that significantly increases their chances of landing an interview.
@@ -21,36 +22,35 @@ Return ONLY a valid JSON object in the following format, using the data extracte
     "name": "[Full Name]",
     "contact": "[City, Province | Email | Phone | LinkedIn Profile URL (if available)]"
   },
-  "summary": "[A compelling 3-4 sentence professional summary that immediately grabs the recruiter's attention. It should highlight the candidate's key qualifications and experience as they relate to the target job, starting with a powerful opening like: 'A results-driven professional with X years of experience in...']",
+  "summary": "[A 2-3 sentence professional summary tailored to the target job, highlighting key qualifications and achievements.]",
   "experience": [
     {
       "company": "[Company Name]",
-      "title": "[Job Title]",
       "location": "[City, Province]",
-      "dates": "[Month Year – Month Year]",
+      "dates": "[MMM YYYY - MMM YYYY]",
+      "title": "[Job Title]",
       "bullets": [
-        "[Create a powerful, achievement-oriented bullet point. Start with an action verb, describe the task, and highlight the quantifiable result (e.g., 'Increased sales by 20% in Q3 by implementing a new social media strategy').]"
+        "[Achievement with quantifiable impact and relevant keywords]",
+        "[Use strong action verbs and measurable outcomes]"
       ]
     }
   ],
   "education": [
     {
-      "school": "[University/College Name]",
+      "school": "[School Name]",
       "location": "[City, Province]",
-      "dates": "[Year – Year]",
-      "degree": "[Degree and Major]",
-      "bullets": ["[Include any honors, relevant coursework, or high GPA if it adds significant value.]"]
+      "dates": "[Year - Year]",
+      "degree": "[Degree or Diploma]"
     }
   ],
   "additional": {
-    "technical_skills": "[A comma-separated list of key technical skills, tailored to the job description.]",
-    "soft_skills": "[A comma-separated list of relevant soft skills (e.g., Communication, Teamwork, Problem-Solving). ]",
-    "languages": "[A comma-separated list of languages and proficiency levels (e.g., 'English (Native)', 'French (Professional)').]",
-    "certifications": "[A comma-separated list of professional certifications.]",
+    "technical_skills": "[A comma-separated list of technical skills relevant to the job]",
+    "languages": "[Languages spoken]",
+    "certifications": "[Certifications relevant to the target job]",
     "awards": "[A comma-separated list of relevant awards or recognitions.]"
   }
 }
-`;;
+`;
 
 export async function optimizeResume(
   request: OptimizationRequest, 
@@ -150,19 +150,56 @@ export async function optimizeResume(
       // Removed debug log to reduce console spam
     });
 
-    // Determine API base: prefer env var for production, fallback to same-origin
-    const envBase = (import.meta as any)?.env?.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.__VITE_API_BASE_URL : undefined)
-    const apiBase = typeof envBase === 'string' && envBase.length > 0 
-      ? envBase.replace(/\/$/, '')
-      : ''
+    // Determine API base:
+    // 1) Use env var if present
+    // 2) Use window.__VITE_API_BASE_URL if provided by index.html
+    // 3) In localhost, use canonical domain + '/api'
+    // 4) In production, use current origin + '/api'
+    // 5) Fallback to same-origin '/api/optimize'
+    let apiBase = ''
+    try {
+      const envBase = (import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined
+      const winBase = typeof window !== 'undefined' ? (window as any).__VITE_API_BASE_URL as string | undefined : undefined
+      const selectedBase = envBase || winBase
+      if (selectedBase && selectedBase.length > 0) {
+        apiBase = selectedBase.replace(/\/$/, '')
+      } else if (typeof window !== 'undefined') {
+        const host = window.location.hostname
+        const isLocal = host === 'localhost' || host === '127.0.0.1'
+        if (isLocal) {
+          const canonicalEl = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null
+          const canonicalOrigin = canonicalEl?.href ? new URL(canonicalEl.href).origin : null
+          if (canonicalOrigin) {
+            apiBase = `${canonicalOrigin}/api`.replace(/\/$/, '')
+          }
+        } else {
+          apiBase = `${window.location.origin}/api`.replace(/\/$/, '')
+        }
+      }
+    } catch { /* no-op */ }
     const url = apiBase ? `${apiBase}/optimize` : '/api/optimize'
+    console.log('🔧 API base resolved:', { apiBase, url })
+
+    // Attach Supabase access token for server-side verification
+    let accessToken: string | undefined
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      accessToken = session?.access_token
+    } catch (e) {
+      console.warn('⚠️ Unable to retrieve Supabase session for API call:', e)
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`
+    }
 
     // Making fetch request to optimize endpoint
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         jobTitle: request.jobTitle,
         jobDescription: request.jobDescription,
@@ -211,50 +248,8 @@ export async function optimizeResume(
       successValue: data.success,
       hasData: 'data' in data,
       dataType: typeof data.data,
-      dataKeys: data.data ? Object.keys(data.data) : [],
-      hasError: 'error' in data,
-      errorValue: data.error
     });
-    
-    // If data.data exists, log its structure in detail
-    if (data.data) {
-      console.log('🔍 API: AI Response Data Structure:', {
-        summary: {
-          exists: !!data.data.summary,
-          type: typeof data.data.summary,
-          length: data.data.summary?.length || 0
-        },
-        experience: {
-          exists: !!data.data.experience,
-          type: typeof data.data.experience,
-          isArray: Array.isArray(data.data.experience),
-          length: data.data.experience?.length || 0,
-          value: data.data.experience
-        },
-        skills: {
-          exists: !!data.data.skills,
-          type: typeof data.data.skills,
-          isArray: Array.isArray(data.data.skills),
-          length: data.data.skills?.length || 0,
-          value: data.data.skills
-        },
-        education: {
-          exists: !!data.data.education,
-          type: typeof data.data.education,
-          isArray: Array.isArray(data.data.education),
-          length: data.data.education?.length || 0,
-          value: data.data.education
-        },
-        certifications: {
-          exists: !!data.data.certifications,
-          type: typeof data.data.certifications,
-          isArray: Array.isArray(data.data.certifications),
-          length: data.data.certifications?.length || 0,
-          value: data.data.certifications
-        }
-      });
-    }
-    
+
     // Validate the response structure
     if (data.success && data.data) {
       return {

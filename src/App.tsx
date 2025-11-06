@@ -6,15 +6,16 @@ import PrivacyPolicy from './pages/privacy'
 import AuthPage from './pages/AuthPage'
 import ContactPage from './pages/contact'
 import SettingsPage from './pages/settings'
+import VerifyPage from './pages/verify'
 import { useAuthStore } from './stores/authStore'
 import { supabase } from './lib/supabase'
-import { secureLogout } from './lib/auth'
+import { secureLogout, isVerified, syncVerifiedMetadata } from './lib/auth'
 
 function App() {
   const { user, setUser, logout } = useAuthStore()
   
   // Check URL path to determine initial view
-  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' => {
+  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' => {
     const path = window.location.pathname
     if (path === '/optimize') {
       return 'wizard'
@@ -34,14 +35,22 @@ function App() {
     if (path === '/contact') {
       return 'contact'
     }
+    if (path === '/verify') {
+      return 'verify'
+    }
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings'>(
+  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify'>(
     getInitialView()
   )
 
-  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings') => {
+  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify') => {
+    // Gate wizard: unverified users go to verify page
+    if (view === 'wizard' && user && !isVerified(user)) {
+      view = 'verify'
+    }
+
     setCurrentView(view)
     let path = '/'
     if (view === 'wizard') {
@@ -56,13 +65,19 @@ function App() {
       path = '/auth'
     } else if (view === 'contact') {
       path = '/contact'
+    } else if (view === 'verify') {
+      path = '/verify'
     }
     window.history.pushState({}, '', path)
   }
 
   const handleGetStarted = () => {
     if (user) {
-      handleNavigation('wizard')
+      if (!isVerified(user)) {
+        handleNavigation('verify')
+      } else {
+        handleNavigation('wizard')
+      }
     } else {
       handleNavigation('auth')
     }
@@ -104,6 +119,7 @@ function App() {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         setUser(session.user)
+        try { if (session.user.email_confirmed_at) { await syncVerifiedMetadata() } } catch {}
       }
     }
 
@@ -112,17 +128,51 @@ function App() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      // Best-effort metadata sync when email becomes confirmed
+      try { if (session?.user?.email_confirmed_at) { syncVerifiedMetadata() } } catch {}
     })
 
     return () => subscription.unsubscribe()
   }, [setUser])
 
-  // If user is authenticated and currently on Auth page, send them to the wizard
+  // If user is authenticated and currently on Auth page, send them home or to Verify
   useEffect(() => {
     if (user && currentView === 'auth') {
-      handleNavigation('home')
+      if (!isVerified(user)) {
+        handleNavigation('verify')
+      } else {
+        handleNavigation('home')
+      }
     }
   }, [user, currentView])
+
+  // Force unverified authenticated users to the Verify page universally
+  useEffect(() => {
+    if (user && !isVerified(user) && currentView !== 'verify') {
+      handleNavigation('verify')
+    }
+  }, [user, currentView])
+
+  // Hydrate session from verification hash tokens if present
+  useEffect(() => {
+    try {
+      const hash = window.location.hash.replace('#', '')
+      const params = new URLSearchParams(hash)
+      const access_token = params.get('access_token')
+      const refresh_token = params.get('refresh_token')
+      if (access_token && refresh_token) {
+        supabase.auth.setSession({ access_token, refresh_token })
+          .then(() => {
+            const cleanUrl = window.location.pathname + window.location.search
+            window.history.replaceState({}, '', cleanUrl)
+            setCurrentView(getInitialView())
+            // Sync metadata in case email was just confirmed
+            try { syncVerifiedMetadata() } catch {}
+          })
+          .catch((e) => console.warn('Supabase setSession error:', e))
+      }
+    } catch { /* no-op */ }
+  }, [])
 
   const renderView = () => {
     switch (currentView) {
@@ -140,6 +190,8 @@ function App() {
         return <ContactPage />
       case 'settings':
         return <SettingsPage />
+      case 'verify':
+        return <VerifyPage />
       default:
         return <Hero onGetStarted={handleGetStarted} user={user} onLogout={handleLogout} />
     }
