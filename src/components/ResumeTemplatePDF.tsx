@@ -1,5 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { OptimizedResume } from '@/types/resume'
 
 // === PROFESSIONAL COLOR PALETTE ===
 const COLORS = {
@@ -207,7 +208,7 @@ const approxLines = (text: string, charsPerLine = 85) => {
   return Math.max(hardLines, softLines);
 };
 
-const estimateTotalLines = (resume: ResumeData) => {
+const estimateTotalLines = (resume: OptimizedResume) => {
   let lines = 0;
   lines += approxLines(resume.summary || '');
   (resume.experience || []).forEach(exp => {
@@ -216,8 +217,8 @@ const estimateTotalLines = (resume: ResumeData) => {
   });
   (resume.education || []).forEach(edu => {
     lines += 2; // school/location + degree/dates rows
-    lines += approxLines(edu.minor || '', 90);
-    lines += approxLines(edu.details || '', 90);
+    lines += approxLines((edu as any).minor || '', 90);
+    lines += approxLines((edu as any).details || '', 90);
   });
   const add = resume.additional || {} as any;
   lines += approxLines(add.technical_skills || '', 90);
@@ -228,7 +229,7 @@ const estimateTotalLines = (resume: ResumeData) => {
 };
 
 // Estimate total character length of content for scaling decisions
-const estimateContentLength = (resume: ResumeData): number => {
+const estimateContentLength = (resume: OptimizedResume): number => {
   let total = 0;
 
   const addStr = (s?: string) => { if (s) total += String(s).length; };
@@ -237,9 +238,8 @@ const estimateContentLength = (resume: ResumeData): number => {
   // Header
   addStr(resume.header?.name);
   addStr(resume.header?.contact);
-  // Occasionally present
-  // @ts-expect-error optional address field may exist
-  addStr(resume.header?.address);
+  const headerAny = resume.header as any
+  addStr(headerAny.address);
 
   // Summary
   addStr(resume.summary);
@@ -260,11 +260,9 @@ const estimateContentLength = (resume: ResumeData): number => {
     addStr(edu.dates);
     addStr(edu.degree);
     addArr(edu.bullets);
-    // Optional fields sometimes included
-    // @ts-expect-error optional minor/details fields may exist
-    addStr((edu as any).minor);
-    // @ts-expect-error optional minor/details fields may exist
-    addStr((edu as any).details);
+    const eduAny = edu as any
+    addStr(eduAny.minor);
+    addStr(eduAny.details);
   });
 
   // Additional information
@@ -347,7 +345,7 @@ const renderBullets = (bullets: string[], dyn: any) =>
     </View>
   ));
 
-export const ResumeTemplatePDF: React.FC<{ resume: ResumeData; template?: TemplateVariant }> = ({ resume, template = 'modern' }) => {
+export const ResumeTemplatePDF: React.FC<{ resume: OptimizedResume; template?: TemplateVariant }> = ({ resume, template = 'modern' }) => {
   if (!resume || !resume.header) {
     return (
       <Document>
@@ -370,7 +368,7 @@ export const ResumeTemplatePDF: React.FC<{ resume: ResumeData; template?: Templa
   const tmpl = getTemplateStyles(template)
 
   const rawSegments = (resume.header.contact || '').split(/\s*[|•·,]\s*/).filter(Boolean);
-  const addressParts = (resume.header.address || '').split(/\s*,\s*/).filter(Boolean);
+  const addressParts = (((resume.header as any).address) || '').split(/\s*,\s*/).filter(Boolean);
   const normalizedSegments = [...addressParts, ...rawSegments]
     .map(s => s.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim())
     .filter(Boolean);
@@ -440,11 +438,11 @@ export const ResumeTemplatePDF: React.FC<{ resume: ResumeData; template?: Templa
                     <Text style={styles.degree}>{edu.degree}</Text>
                     <Text style={[styles.dates, dyn.dates]}>{edu.dates}</Text>
                   </View>
-                  {edu.minor && (
-                    <Text style={styles.educationDetails}>• {edu.minor}</Text>
+                  {(edu as any).minor && (
+                    <Text style={styles.educationDetails}>• {(edu as any).minor}</Text>
                   )}
-                  {edu.details && (
-                    <Text style={styles.educationDetails}>• {edu.details}</Text>
+                  {(edu as any).details && (
+                    <Text style={styles.educationDetails}>• {(edu as any).details}</Text>
                   )}
                 </View>
               ))}
