@@ -198,87 +198,156 @@ const styles = StyleSheet.create({
   },
 });
 
-// === DYNAMIC SCALING (FILL FULL A4 WHEN CONTENT IS SHORT) ===
-
-type ScaleMode = 'compact' | 'normal' | 'expanded';
-
-const estimateContentLength = (resume: ResumeData) => {
-  const expText = (resume.experience || [])
-    .map(e => `${e.company}${e.title}${e.location}${e.dates}${(e.bullets||[]).join('')}`)
-    .join('');
-  const eduText = (resume.education || [])
-    .map(e => `${e.school}${e.degree}${e.location}${e.dates}${e.details||''}${e.minor||''}`)
-    .join('');
-  const addText = Object.values(resume.additional || {}).join('');
-  return (
-    (resume.summary || '').length + expText.length + eduText.length + addText.length
-  );
+// === DENSITY & FIT CALCULATION ===
+const approxLines = (text: string, charsPerLine = 85) => {
+  if (!text) return 0;
+  const t = String(text);
+  const hardLines = t.split(/\n+/).length;
+  const softLines = Math.ceil(t.replace(/\n+/g, ' ').length / charsPerLine);
+  return Math.max(hardLines, softLines);
 };
 
-const getDynamicStyles = (mode: ScaleMode) => ({
+const estimateTotalLines = (resume: ResumeData) => {
+  let lines = 0;
+  lines += approxLines(resume.summary || '');
+  (resume.experience || []).forEach(exp => {
+    lines += 2; // company/location + role/dates rows
+    (exp.bullets || []).forEach(b => { lines += approxLines(b, 80); });
+  });
+  (resume.education || []).forEach(edu => {
+    lines += 2; // school/location + degree/dates rows
+    lines += approxLines(edu.minor || '', 90);
+    lines += approxLines(edu.details || '', 90);
+  });
+  const add = resume.additional || {} as any;
+  lines += approxLines(add.technical_skills || '', 90);
+  lines += approxLines(add.languages || '', 90);
+  lines += approxLines(add.certifications || '', 90);
+  lines += approxLines(add.awards || '', 90);
+  return lines;
+};
+
+// Estimate total character length of content for scaling decisions
+const estimateContentLength = (resume: ResumeData): number => {
+  let total = 0;
+
+  const addStr = (s?: string) => { if (s) total += String(s).length; };
+  const addArr = (arr?: string[]) => { (arr || []).forEach(b => addStr(b)); };
+
+  // Header
+  addStr(resume.header?.name);
+  addStr(resume.header?.contact);
+  // Occasionally present
+  // @ts-expect-error optional address field may exist
+  addStr(resume.header?.address);
+
+  // Summary
+  addStr(resume.summary);
+
+  // Experience
+  (resume.experience || []).forEach(exp => {
+    addStr(exp.company);
+    addStr(exp.location);
+    addStr(exp.dates);
+    addStr(exp.title);
+    addArr(exp.bullets);
+  });
+
+  // Education
+  (resume.education || []).forEach(edu => {
+    addStr(edu.school);
+    addStr(edu.location);
+    addStr(edu.dates);
+    addStr(edu.degree);
+    addArr(edu.bullets);
+    // Optional fields sometimes included
+    // @ts-expect-error optional minor/details fields may exist
+    addStr((edu as any).minor);
+    // @ts-expect-error optional minor/details fields may exist
+    addStr((edu as any).details);
+  });
+
+  // Additional information
+  const add = (resume.additional || {}) as any;
+  addStr(add.technical_skills);
+  addStr(add.languages);
+  addStr(add.certifications);
+  addStr(add.awards);
+
+  return total;
+};
+
+// === DYNAMIC SCALING (FIT TO SINGLE PAGE) ===
+type ScaleMode = 'compact' | 'normal' | 'expanded';
+
+const getDynamicStyles = (mode: ScaleMode, fitLevel: 0 | 1 | 2 = 0) => ({
   page: {
-    fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? 9 : 10,
-    lineHeight: mode === 'expanded' ? 1.25 : mode === 'compact' ? 1.12 : 1.15,
+    fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel === 2 ? 8 : fitLevel === 1 ? 9 : 9) : 10,
+    lineHeight: mode === 'expanded' ? 1.25 : mode === 'compact' ? (fitLevel >= 1 ? 1.08 : 1.12) : 1.15,
+    padding: mode === 'expanded' ? 72 : mode === 'compact' ? (fitLevel === 2 ? 36 : fitLevel === 1 ? 48 : 56) : 64,
   },
   sectionsContainer: {
     justifyContent: mode === 'expanded' ? 'space-between' : 'flex-start',
   },
   section: {
-    marginBottom: mode === 'expanded' ? 12 : mode === 'compact' ? 6 : 10,
+    marginBottom: mode === 'expanded' ? 12 : mode === 'compact' ? (fitLevel >= 1 ? 6 : 8) : 10,
   },
-  name: { fontSize: mode === 'expanded' ? 26 : mode === 'compact' ? 18 : 22 },
-  sectionTitle: { fontSize: mode === 'expanded' ? 14 : 12 },
-  contactInfo: { fontSize: mode === 'expanded' ? 11 : 10 },
-  contactLine: { marginBottom: mode === 'expanded' ? 10 : mode === 'compact' ? 6 : 8 },
-  company: { fontSize: mode === 'expanded' ? 12 : 11 },
-  role: { fontSize: mode === 'expanded' ? 11 : 10 },
-  dates: { fontSize: mode === 'expanded' ? 11 : 10 },
+  name: { fontSize: mode === 'expanded' ? 26 : mode === 'compact' ? (fitLevel === 2 ? 16 : fitLevel === 1 ? 18 : 20) : 22 },
+  sectionTitle: { fontSize: mode === 'expanded' ? 14 : mode === 'compact' ? 11 : 12, borderBottomWidth: mode === 'compact' && fitLevel >= 1 ? 0.3 : 0.5 },
+  contactInfo: { fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10 },
+  contactLine: { marginBottom: mode === 'expanded' ? 10 : mode === 'compact' ? (fitLevel >= 1 ? 5 : 6) : 8 },
+  company: { fontSize: mode === 'expanded' ? 12 : mode === 'compact' ? (fitLevel >= 1 ? 10 : 11) : 11 },
+  role: { fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10 },
+  dates: { fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10 },
+  bulletRow: { marginBottom: mode === 'expanded' ? 1.0 : mode === 'compact' ? (fitLevel >= 1 ? 0.4 : 0.6) : 0.8 },
+  bullet: { width: mode === 'compact' ? (fitLevel >= 1 ? 4 : 5) : 7 },
   bulletText: {
-    fontSize: mode === 'expanded' ? 11 : 10,
-    lineHeight: mode === 'expanded' ? 1.25 : 1.25,
+    fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10,
+    lineHeight: mode === 'expanded' ? 1.25 : mode === 'compact' ? (fitLevel >= 1 ? 1.08 : 1.18) : 1.22,
+    paddingLeft: mode === 'compact' ? (fitLevel >= 1 ? 1 : 2) : 2,
   },
   additionalText: {
-    fontSize: mode === 'expanded' ? 11 : 10,
-    lineHeight: mode === 'expanded' ? 1.25 : 1.22,
+    fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10,
+    lineHeight: mode === 'expanded' ? 1.25 : mode === 'compact' ? (fitLevel >= 1 ? 1.08 : 1.18) : 1.22,
   },
 });
 
-// === RESUME DATA INTERFACE ===
-interface ResumeData {
-  header: { name: string; contact: string; address?: string };
-  summary: string;
-  experience: Array<{
-    company: string;
-    title: string;
-    location: string;
-    dates: string;
-    bullets: string[];
-  }>;
-  education: Array<{
-    school: string;
-    degree: string;
-    location: string;
-    dates: string;
-    minor?: string;
-    details?: string;
-  }>;
-  additional: {
-    technical_skills?: string;
-    languages?: string;
-    certifications?: string;
-    awards?: string;
-  };
+// Template variant styles
+type TemplateVariant = 'modern' | 'classic' | 'executive'
+
+const getTemplateStyles = (variant: TemplateVariant) => {
+  switch (variant) {
+    case 'modern':
+      return {
+        name: { letterSpacing: 1.5 },
+        sectionTitle: { borderBottomColor: COLORS.mediumGray },
+        contactLine: { color: COLORS.darkGray },
+      }
+    case 'executive':
+      return {
+        name: { letterSpacing: 1.8 },
+        sectionTitle: { borderBottomWidth: 1, letterSpacing: 1.0 },
+        contactLine: { letterSpacing: 0.15 },
+      }
+    case 'classic':
+    default:
+      return {
+        name: {},
+        sectionTitle: {},
+        contactLine: {},
+      }
+  }
 }
 
 const renderBullets = (bullets: string[], dyn: any) =>
   bullets.map((b, i) => (
-    <View key={i} style={styles.bulletRow} wrap={false}>
-      <Text style={styles.bullet}>•</Text>
+    <View key={i} style={[styles.bulletRow, dyn.bulletRow]} wrap={false}>
+      <Text style={[styles.bullet, dyn.bullet]}>•</Text>
       <Text style={[styles.bulletText, dyn.bulletText]}>{b}</Text>
     </View>
   ));
 
-export const ResumeTemplatePDF: React.FC<{ resume: ResumeData }> = ({ resume }) => {
+export const ResumeTemplatePDF: React.FC<{ resume: ResumeData; template?: TemplateVariant }> = ({ resume, template = 'modern' }) => {
   if (!resume || !resume.header) {
     return (
       <Document>
@@ -293,8 +362,13 @@ export const ResumeTemplatePDF: React.FC<{ resume: ResumeData }> = ({ resume }) 
   }
 
   const contentLen = estimateContentLength(resume);
+  const estLines = estimateTotalLines(resume);
+  // Define fit levels based on estimated lines; aim for single-page
+  const fitLevel: 0 | 1 | 2 = estLines > 120 ? 2 : estLines > 95 ? 1 : 0;
   const mode: ScaleMode = contentLen < 1200 ? 'expanded' : contentLen > 2200 ? 'compact' : 'normal';
-  const dyn = getDynamicStyles(mode);
+  const dyn = getDynamicStyles(mode, fitLevel);
+  const tmpl = getTemplateStyles(template)
+
   const rawSegments = (resume.header.contact || '').split(/\s*[|•·,]\s*/).filter(Boolean);
   const addressParts = (resume.header.address || '').split(/\s*,\s*/).filter(Boolean);
   const normalizedSegments = [...addressParts, ...rawSegments]
@@ -303,11 +377,9 @@ export const ResumeTemplatePDF: React.FC<{ resume: ResumeData }> = ({ resume }) 
   const NBSP = '\u00A0';
   const SEP = `${NBSP}•${NBSP}`;
   let contactLineText = normalizedSegments.join(SEP);
-  // Prevent wrapping between city and province
   contactLineText = contactLineText.replace(/,\s/g, `,${NBSP}`);
-  // Reduce font size slightly for very long contact lines to avoid wrapping
   const contactStyleOverride = {
-    fontSize: contactLineText.length > 80 ? 9 : 10,
+    fontSize: contactLineText.length > 80 ? (fitLevel >= 1 ? 8 : 9) : 10,
     letterSpacing: contactLineText.length > 80 ? 0.1 : 0.2,
   } as const;
 
@@ -316,10 +388,10 @@ export const ResumeTemplatePDF: React.FC<{ resume: ResumeData }> = ({ resume }) 
       <Page size="A4" style={[styles.page, dyn.page]}>
         {/* HEADER */}
         <View style={styles.header} wrap={false}>
-          <Text style={[styles.name, dyn.name]}>{resume.header.name}</Text>
+          <Text style={[styles.name, dyn.name, tmpl.name]}>{resume.header.name}</Text>
           <View style={styles.contactGroup}>
             {contactLineText && (
-              <Text style={[styles.contactLine, dyn.contactLine, contactStyleOverride]} wrap={false}>{contactLineText}</Text>
+              <Text style={[styles.contactLine, dyn.contactLine, contactStyleOverride, tmpl.contactLine]} wrap={false}>{contactLineText}</Text>
             )}
           </View>
         </View>
@@ -329,15 +401,15 @@ export const ResumeTemplatePDF: React.FC<{ resume: ResumeData }> = ({ resume }) 
           {/* SUMMARY */}
           {resume.summary && (
             <View style={[styles.section, dyn.section]}>
-              <Text style={[styles.sectionTitle, dyn.sectionTitle]}>PROFESSIONAL SUMMARY</Text>
-              <Text style={styles.summary}>{resume.summary}</Text>
+              <Text style={[styles.sectionTitle, dyn.sectionTitle, tmpl.sectionTitle]}>PROFESSIONAL SUMMARY</Text>
+              <Text style={[styles.summary, dyn.additionalText]}>{resume.summary}</Text>
             </View>
           )}
 
           {/* EXPERIENCE */}
           {resume.experience && resume.experience.length > 0 && (
             <View style={[styles.section, dyn.section]}>
-              <Text style={[styles.sectionTitle, dyn.sectionTitle]}>PROFESSIONAL EXPERIENCE</Text>
+              <Text style={[styles.sectionTitle, dyn.sectionTitle, tmpl.sectionTitle]}>PROFESSIONAL EXPERIENCE</Text>
               {resume.experience.map((exp, i) => (
                 <View key={i} style={styles.experienceItem}>
                   <View style={styles.companyRow}>
@@ -357,7 +429,7 @@ export const ResumeTemplatePDF: React.FC<{ resume: ResumeData }> = ({ resume }) 
           {/* EDUCATION */}
           {resume.education && resume.education.length > 0 && (
             <View style={[styles.section, dyn.section]}>
-              <Text style={[styles.sectionTitle, dyn.sectionTitle]}>EDUCATION</Text>
+              <Text style={[styles.sectionTitle, dyn.sectionTitle, tmpl.sectionTitle]}>EDUCATION</Text>
               {resume.education.map((edu, i) => (
                 <View key={i} style={styles.educationItem}>
                   <View style={styles.companyRow}>
@@ -382,30 +454,42 @@ export const ResumeTemplatePDF: React.FC<{ resume: ResumeData }> = ({ resume }) 
           {/* ADDITIONAL */}
           {resume.additional && (
             <View style={[styles.section, dyn.section]}>
-              <Text style={[styles.sectionTitle, dyn.sectionTitle]}>ADDITIONAL INFORMATION</Text>
-              {resume.additional.technical_skills && (
-                <View style={styles.additionalSection}>
-                  <Text style={styles.additionalTitle}>Technical Skills:</Text>
-                  <Text style={[styles.additionalText, dyn.additionalText]}>{resume.additional.technical_skills}</Text>
-                </View>
-              )}
-              {resume.additional.languages && (
-                <View style={styles.additionalSection}>
-                  <Text style={styles.additionalTitle}>Languages:</Text>
-                  <Text style={[styles.additionalText, dyn.additionalText]}>{resume.additional.languages}</Text>
-                </View>
-              )}
-              {resume.additional.certifications && (
-                <View style={styles.additionalSection}>
-                  <Text style={styles.additionalTitle}>Certifications:</Text>
-                  <Text style={[styles.additionalText, dyn.additionalText]}>{resume.additional.certifications}</Text>
-                </View>
-              )}
-              {resume.additional.awards && (
-                <View style={styles.additionalSection}>
-                  <Text style={styles.additionalTitle}>Awards:</Text>
-                  <Text style={[styles.additionalText, dyn.additionalText]}>{resume.additional.awards}</Text>
-                </View>
+              <Text style={[styles.sectionTitle, dyn.sectionTitle, tmpl.sectionTitle]}>ADDITIONAL INFORMATION</Text>
+              {fitLevel >= 2 ? (
+                // Compact inline layout to reduce vertical space
+                <Text style={[styles.additionalText, dyn.additionalText]}>
+                  {resume.additional.technical_skills ? `Technical Skills: ${resume.additional.technical_skills}` : ''}
+                  {resume.additional.languages ? `${SEP}Languages: ${resume.additional.languages}` : ''}
+                  {resume.additional.certifications ? `${SEP}Certifications: ${resume.additional.certifications}` : ''}
+                  {resume.additional.awards ? `${SEP}Awards: ${resume.additional.awards}` : ''}
+                </Text>
+              ) : (
+                <>
+                  {resume.additional.technical_skills && (
+                    <View style={styles.additionalSection}>
+                      <Text style={styles.additionalTitle}>Technical Skills:</Text>
+                      <Text style={[styles.additionalText, dyn.additionalText]}>{resume.additional.technical_skills}</Text>
+                    </View>
+                  )}
+                  {resume.additional.languages && (
+                    <View style={styles.additionalSection}>
+                      <Text style={styles.additionalTitle}>Languages:</Text>
+                      <Text style={[styles.additionalText, dyn.additionalText]}>{resume.additional.languages}</Text>
+                    </View>
+                  )}
+                  {resume.additional.certifications && (
+                    <View style={styles.additionalSection}>
+                      <Text style={styles.additionalTitle}>Certifications:</Text>
+                      <Text style={[styles.additionalText, dyn.additionalText]}>{resume.additional.certifications}</Text>
+                    </View>
+                  )}
+                  {resume.additional.awards && (
+                    <View style={styles.additionalSection}>
+                      <Text style={styles.additionalTitle}>Awards:</Text>
+                      <Text style={[styles.additionalText, dyn.additionalText]}>{resume.additional.awards}</Text>
+                    </View>
+                  )}
+                </>
               )}
             </View>
           )}

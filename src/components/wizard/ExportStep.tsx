@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Download, FileText, File, Code, CheckCircle, AlertCircle, FileImage } from 'lucide-react'
-import { exportAsText, exportAsWord, exportAsJSON } from '../../lib/exportUtils'
+import { Download, FileText, Code, CheckCircle, AlertCircle, FileImage } from 'lucide-react'
+import { exportAsText, exportAsJSON, exportLinkedInSummary, trackExport } from '../../lib/exportUtils'
+import { logExport } from '@/lib/analytics'
 import { pdf } from '@react-pdf/renderer'
 import { ResumeTemplatePDF } from '../ResumeTemplatePDF'
 import type { OptimizedResume } from '../../types/resume'
@@ -13,6 +14,7 @@ interface ExportStepProps {
 
 export function ExportStep({ optimizedResume }: ExportStepProps) {
   const [exportStatus, setExportStatus] = useState<{[key: string]: 'idle' | 'loading' | 'success' | 'error'}>({})
+  const [template, setTemplate] = useState<'modern' | 'classic' | 'executive'>('modern')
 
   if (!optimizedResume) {
     return (
@@ -25,33 +27,30 @@ export function ExportStep({ optimizedResume }: ExportStepProps) {
     )
   }
 
-  const handleExport = async (format: 'text' | 'word' | 'json' | 'pdf', filename: string) => {
+  const handleExport = async (format: 'text' | 'json' | 'pdf' | 'linkedin', filename: string) => {
     setExportStatus(prev => ({ ...prev, [format]: 'loading' }))
     
     try {
       switch (format) {
         case 'text':
           await exportAsText(optimizedResume, filename)
-          break
-        case 'word':
-          await exportAsWord(optimizedResume, filename)
+          trackExport('text', template)
+          logExport({ id: crypto.randomUUID(), ts: Date.now(), format: 'text', template })
           break
         case 'json':
           await exportAsJSON(optimizedResume, filename)
+          trackExport('json', template)
+          logExport({ id: crypto.randomUUID(), ts: Date.now(), format: 'json', template })
           break
         case 'pdf':
           try {
-            // Validate resume data before PDF generation
             if (!optimizedResume || !optimizedResume.header || !optimizedResume.header.name) {
               throw new Error('Invalid resume data: Missing header information')
             }
-            
-            const pdfBlob = await pdf(<ResumeTemplatePDF resume={optimizedResume} />).toBlob()
-            
+            const pdfBlob = await pdf(<ResumeTemplatePDF resume={optimizedResume as any} template={template} />).toBlob()
             if (!pdfBlob || pdfBlob.size === 0) {
               throw new Error('PDF generation failed: Empty blob created')
             }
-            
             const url = URL.createObjectURL(pdfBlob)
             const link = document.createElement('a')
             link.href = url
@@ -60,64 +59,26 @@ export function ExportStep({ optimizedResume }: ExportStepProps) {
             link.click()
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
+            trackExport('pdf', template)
+            logExport({ id: crypto.randomUUID(), ts: Date.now(), format: 'pdf', template })
           } catch (pdfError) {
             console.error('PDF Export Error:', pdfError)
-            // Re-throw with more specific error message
-            throw new Error(`PDF Export Failed: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`)
+            throw new Error(`PDF export failed: ${pdfError instanceof Error ? pdfError.message : String(pdfError)}`)
           }
           break
+        case 'linkedin':
+          await exportLinkedInSummary(optimizedResume, filename)
+          trackExport('linkedin', template)
+          logExport({ id: crypto.randomUUID(), ts: Date.now(), format: 'linkedin', template })
+          break
       }
-      
-      setExportStatus(prev => ({ ...prev, [format]: 'success' }))
-      
-      // Reset status after 3 seconds
-      setTimeout(() => {
-        setExportStatus(prev => ({ ...prev, [format]: 'idle' }))
-      }, 3000)
-      
-    } catch (error) {
-      console.error(`Export error (${format}):`, error)
-      setExportStatus(prev => ({ ...prev, [format]: 'error' }))
-      
-      // Reset status after 3 seconds
-      setTimeout(() => {
-        setExportStatus(prev => ({ ...prev, [format]: 'idle' }))
-      }, 3000)
-    }
-  }
 
-  const getButtonContent = (format: string, defaultText: string, icon: React.ReactNode) => {
-    const status = exportStatus[format]
-    
-    switch (status) {
-      case 'loading':
-        return (
-          <>
-            <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-            Exporting...
-          </>
-        )
-      case 'success':
-        return (
-          <>
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Downloaded!
-          </>
-        )
-      case 'error':
-        return (
-          <>
-            <AlertCircle className="w-4 h-4 mr-2" />
-            Try Again
-          </>
-        )
-      default:
-        return (
-          <>
-            {icon}
-            {defaultText}
-          </>
-        )
+      setExportStatus(prev => ({ ...prev, [format]: 'success' }))
+    } catch (error) {
+      console.error('Export Error:', error)
+      setExportStatus(prev => ({ ...prev, [format]: 'error' }))
+    } finally {
+      setTimeout(() => setExportStatus(prev => ({ ...prev, [format]: 'idle' })), 1500)
     }
   }
 
@@ -148,6 +109,15 @@ export function ExportStep({ optimizedResume }: ExportStepProps) {
       filename: 'optimized-resume.json',
       recommended: false,
       features: ['LinkedIn compatible', 'Machine readable', 'Future-proof format']
+    },
+    {
+      id: 'linkedin',
+      title: 'LinkedIn Summary (.txt)',
+      description: 'Concise profile-ready About section with skills',
+      icon: <FileText className="w-6 h-6" />,
+      filename: 'linkedin-summary.txt',
+      recommended: false,
+      features: ['Profile-ready About', 'Includes skills list', 'Length-safe (~2200 chars)']
     }
   ]
 
@@ -165,7 +135,19 @@ export function ExportStep({ optimizedResume }: ExportStepProps) {
         </p>
       </div>
 
-      {/* Export Options */}
+      <Card className="p-4">
+        <CardHeader>
+          <CardTitle>Template</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Button variant={template==='modern'? 'default':'outline'} onClick={() => setTemplate('modern')}>Modern</Button>
+            <Button variant={template==='classic'? 'default':'outline'} onClick={() => setTemplate('classic')}>Classic</Button>
+            <Button variant={template==='executive'? 'default':'outline'} onClick={() => setTemplate('executive')}>Executive</Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         {exportOptions.map((option) => (
           <Card key={option.id} className={`relative ${option.recommended ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}`}>
@@ -190,66 +172,40 @@ export function ExportStep({ optimizedResume }: ExportStepProps) {
                 {option.description}
               </p>
             </CardHeader>
-            
+
             <CardContent>
-              <ul className="space-y-2 mb-4">
-                {option.features.map((feature, index) => (
-                  <li key={index} className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                    <CheckCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-              
-              <Button
-                onClick={() => handleExport(option.id as any, option.filename)}
-                disabled={exportStatus[option.id] === 'loading'}
-                className={`w-full ${
-                  option.recommended 
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : ''
-                }`}
-                variant={option.recommended ? 'default' : 'outline'}
-              >
-                {getButtonContent(option.id, `Download ${option.title.split(' ')[0]}`, <Download className="w-4 h-4 mr-2" />)}
-              </Button>
+              <div className="space-y-4">
+                <ul className="text-sm text-gray-600 dark:text-gray-300 list-disc pl-5">
+                  {option.features.map((f, i) => (
+                    <li key={i}>{f}</li>
+                  ))}
+                </ul>
+
+                <div className="flex justify-between items-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleExport(option.id as any, option.filename)}
+                    disabled={exportStatus[option.id] === 'loading'}
+                  >
+                    {exportStatus[option.id] === 'loading' ? 'Exporting...' : 'Download'}
+                  </Button>
+                  {exportStatus[option.id] === 'success' && (
+                    <div className="flex items-center text-green-600 dark:text-green-400 text-sm">
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Exported
+                    </div>
+                  )}
+                  {exportStatus[option.id] === 'error' && (
+                    <div className="flex items-center text-red-600 dark:text-red-400 text-sm">
+                      <AlertCircle className="w-4 h-4 mr-1" />
+                      Error
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         ))}
-      </div>
-
-      {/* Success Message */}
-      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6">
-        <div className="text-center">
-          <CheckCircle className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-green-900 dark:text-green-100 mb-2">
-            🎉 Congratulations!
-          </h3>
-          <p className="text-green-800 dark:text-green-200 mb-4">
-            Your resume has been successfully optimized with AI. You're now ready to apply for jobs with confidence!
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-sm text-green-800 dark:text-green-200">
-            <div>
-              <h4 className="font-medium mb-2">✨ What we've improved:</h4>
-              <ul className="space-y-1 text-left">
-                <li>• Optimized keywords for ATS systems</li>
-                <li>• Tailored content to job requirements</li>
-                <li>• Enhanced professional formatting</li>
-                <li>• Improved readability and impact</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">🚀 Next steps:</h4>
-              <ul className="space-y-1 text-left">
-                <li>• Review the optimized content</li>
-                <li>• Customize for specific applications</li>
-                <li>• Update your LinkedIn profile</li>
-                <li>• Start applying with confidence!</li>
-              </ul>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   )

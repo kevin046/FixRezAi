@@ -58,20 +58,15 @@
         })
       }
     </script>
-    <!-- Set API base to deployed domain in all environments -->
+    <!-- Set API base: localhost API in dev, same-origin in prod -->
     <script>
       (function() {
         var host = window.location.hostname;
         var isLocal = host === 'localhost' || host === '127.0.0.1';
-        var canonicalEl = document.querySelector('link[rel="canonical"]');
-        var canonicalOrigin = null;
-        try {
-          canonicalOrigin = canonicalEl && canonicalEl.href ? new URL(canonicalEl.href).origin : null;
-        } catch (e) {}
-        // If running locally, route API to canonical domain; else use current origin
-        if (isLocal && canonicalOrigin) {
-          window.__VITE_API_BASE_URL = canonicalOrigin + '/api';
-        } else if (!isLocal) {
+        // In local dev, explicitly point to local API server to avoid CORS
+        if (isLocal) {
+          window.__VITE_API_BASE_URL = 'http://localhost:3003/api';
+        } else {
           window.__VITE_API_BASE_URL = window.location.origin + '/api';
         }
       })();

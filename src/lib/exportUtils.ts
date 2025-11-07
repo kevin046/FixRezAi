@@ -1,5 +1,7 @@
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableCell, TableRow, WidthType } from 'docx';
 import { OptimizedResume } from '@/types/resume';
+
+// Template variants for export styling
+type TemplateVariant = 'modern' | 'classic' | 'executive'
 
 export async function exportAsText(resume: OptimizedResume, filename: string): Promise<void> {
   let text = '';
@@ -54,167 +56,31 @@ export async function exportAsText(resume: OptimizedResume, filename: string): P
   downloadFile(text, filename, 'text/plain');
 }
 
-export async function exportAsWord(resume: OptimizedResume, filename: string): Promise<void> {
-  try {
-    const doc = new Document({
-      styles: {
-        paragraphStyles: [
-          {
-            id: "normalPara",
-            name: "Normal Para",
-            basedOn: "Normal",
-            next: "Normal",
-            quickFormat: true,
-            run: { size: 20, font: "Helvetica" },
-            paragraph: { spacing: { after: 120 } },
-          },
-        ],
-      },
-      sections: [{
-        properties: {},
-        children: [
-          // Header
-          new Paragraph({
-            children: [new TextRun({ text: resume.header.name, bold: true, size: 40, font: "Helvetica-Bold" })],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 80 },
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: resume.header.contact, size: 20, font: "Helvetica" })],
-            alignment: AlignmentType.CENTER,
-          }),
-          new Paragraph({ text: "" }), // Empty line
-          
-          // Professional Summary
-          new Paragraph({
-            text: "PROFESSIONAL SUMMARY",
-            heading: HeadingLevel.HEADING_1,
-            style: "normalPara",
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: resume.summary, size: 20, font: "Helvetica" })],
-            style: "normalPara",
-          }),
-          new Paragraph({ text: "" }), // Empty line
-          
-          // Professional Experience
-          new Paragraph({
-            text: "PROFESSIONAL EXPERIENCE",
-            heading: HeadingLevel.HEADING_1,
-            style: "normalPara",
-          }),
-          ...resume.experience.flatMap(exp => [
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: exp.company, bold: true, size: 20, font: "Helvetica-Bold" })] })] }),
-                    new TableCell({ children: [new Paragraph({ text: exp.location, alignment: AlignmentType.RIGHT, style: "normalPara" })] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: exp.title, italics: true, size: 20, font: "Helvetica-Oblique" })] })] }),
-                    new TableCell({ children: [new Paragraph({ text: exp.dates, alignment: AlignmentType.RIGHT, style: "normalPara" })] }),
-                  ],
-                }),
-              ],
-            }),
-            ...exp.bullets.map(bullet => 
-              new Paragraph({ children: [new TextRun({ text: `• ${bullet}`, size: 20, font: "Helvetica" })], style: "normalPara" })
-            ),
-            new Paragraph({ text: "" }), // Empty line
-          ]),
-          
-          // Education
-          new Paragraph({
-            text: "EDUCATION",
-            heading: HeadingLevel.HEADING_1,
-            style: "normalPara",
-          }),
-          ...resume.education.flatMap(edu => [
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: edu.school, bold: true, size: 20, font: "Helvetica-Bold" })] })] }),
-                    new TableCell({ children: [new Paragraph({ text: edu.location, alignment: AlignmentType.RIGHT, style: "normalPara" })] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: edu.degree, size: 20, font: "Helvetica" })] })] }),
-                    new TableCell({ children: [new Paragraph({ text: edu.dates, alignment: AlignmentType.RIGHT, style: "normalPara" })] }),
-                  ],
-                }),
-              ],
-            }),
-            ...(edu.bullets ? edu.bullets.map(bullet => 
-              new Paragraph({ children: [new TextRun({ text: `• ${bullet}`, size: 20, font: "Helvetica" })], style: "normalPara" })
-            ) : []),
-            new Paragraph({ text: "" }), // Empty line
-          ]),
-          
-          // Additional Information
-          new Paragraph({
-            text: "ADDITIONAL INFORMATION",
-            heading: HeadingLevel.HEADING_1,
-            style: "normalPara",
-          }),
-          ...(resume.additional.technical_skills ? [
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Technical Skills: ", bold: true, size: 20, font: "Helvetica-Bold" }),
-                new TextRun({ text: resume.additional.technical_skills, size: 20, font: "Helvetica" })
-              ],
-              style: "normalPara",
-            })
-          ] : []),
-          ...(resume.additional.languages ? [
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Languages: ", bold: true, size: 20, font: "Helvetica-Bold" }),
-                new TextRun({ text: resume.additional.languages, size: 20, font: "Helvetica" })
-              ],
-              style: "normalPara",
-            })
-          ] : []),
-          ...(resume.additional.certifications ? [
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Certifications: ", bold: true, size: 20, font: "Helvetica-Bold" }),
-                new TextRun({ text: resume.additional.certifications, size: 20, font: "Helvetica" })
-              ],
-              style: "normalPara",
-            })
-          ] : []),
-          ...(resume.additional.awards ? [
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Awards: ", bold: true, size: 20, font: "Helvetica-Bold" }),
-                new TextRun({ text: resume.additional.awards, size: 20, font: "Helvetica" })
-              ],
-              style: "normalPara",
-            })
-          ] : []),
-        ],
-      }],
-    });
-
-    // Use toBlob() instead of toBuffer() for browser compatibility
-    const blob = await Packer.toBlob(doc);
-    downloadBlob(blob, filename);
-  } catch (error) {
-    console.error('Word export error:', error);
-    throw new Error(`Failed to export Word document: ${error.message}`);
-  }
+export async function exportAsJSON(resume: OptimizedResume, filename: string): Promise<void> {
+  const json = JSON.stringify(resume, null, 2);
+  downloadFile(json, filename, 'application/json');
 }
 
-export async function exportAsJSON(resume: OptimizedResume, filename: string): Promise<void> {
-  const jsonString = JSON.stringify(resume, null, 2);
-  downloadFile(jsonString, filename, 'application/json');
+export async function exportLinkedInSummary(resume: OptimizedResume, filename: string): Promise<void> {
+  const content = `ABOUT\n${resume.summary}\n\nSKILLS\n${resume.additional.technical_skills || ''}`
+  downloadFile(content, filename, 'text/plain')
+}
+
+// Lightweight export analytics (localStorage-based)
+export function trackExport(format: string, template?: TemplateVariant): void {
+  try {
+    const key = 'fixrez_export_analytics'
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null
+    const data = raw ? JSON.parse(raw) : { counts: {}, lastExport: null }
+    data.counts[format] = (data.counts[format] || 0) + 1
+    data.lastExport = { format, template: template || null, ts: Date.now() }
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(key, JSON.stringify(data))
+    }
+    console.log('📊 Export analytics:', data.lastExport)
+  } catch (e) {
+    console.log('Analytics storage unavailable, skipping.')
+  }
 }
 
 function downloadFile(content: string, filename: string, mimeType: string): void {
@@ -224,11 +90,11 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }

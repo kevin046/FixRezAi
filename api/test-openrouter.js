@@ -55,17 +55,17 @@ app.get('/api/test-openrouter', async (req, res) => {
     const modelsData = await modelsResponse.json();
     console.log(`✅ Successfully fetched ${modelsData.data?.length || 0} models`);
 
-    // Test 2: Simple chat completion with a free model
+    // Test 2: Simple chat completion with requested free model
     console.log('💬 Testing chat completion with free model...');
-    const testModel = 'deepseek/deepseek-chat-v3.1:free'; // Use DeepSeek v3.1 free model
+    const testModel = process.env.OPENROUTER_MODEL || 'minimax/minimax-m2:free';
     
     const chatResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'http://localhost:5173',
-        'X-Title': 'FixRez'
+        'HTTP-Referer': process.env.OPENROUTER_REFERER || 'http://localhost:5173',
+        'X-Title': process.env.OPENROUTER_TITLE || 'FixRez'
       },
       body: JSON.stringify({
         model: testModel,
@@ -147,9 +147,10 @@ app.post('/api/test-model', async (req, res) => {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "X-Title": "FixRez"
+        "HTTP-Referer": process.env.OPENROUTER_REFERER || 'http://localhost:5173',
+        "X-Title": process.env.OPENROUTER_TITLE || 'FixRez'
       },
       body: JSON.stringify({
         model: model,

@@ -14,6 +14,17 @@ export function PreviewStep({ optimizedResume, onOptimizedResumeChange }: Previe
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState('')
   const [activeSection, setActiveSection] = useState<'header' | 'summary' | 'experience' | 'education' | 'additional'>('header')
+  const [template, setTemplate] = useState<'modern' | 'classic' | 'executive'>('modern')
+   const rootTemplateClass = template === 'classic'
+     ? 'font-serif'
+     : template === 'executive'
+     ? 'tracking-wide'
+     : ''
+   const sectionTitleClass = template === 'executive'
+     ? 'uppercase tracking-wide border-b pb-1'
+     : template === 'classic'
+     ? 'font-semibold'
+     : 'font-medium'
 
   if (!optimizedResume) {
     return (
@@ -88,7 +99,7 @@ export function PreviewStep({ optimizedResume, onOptimizedResumeChange }: Previe
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${rootTemplateClass}`}>
       <div className="text-center">
         <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <Eye className="w-8 h-8 text-green-600 dark:text-green-400" />
@@ -100,6 +111,19 @@ export function PreviewStep({ optimizedResume, onOptimizedResumeChange }: Previe
           Review the AI-optimized content and make any final adjustments before exporting.
         </p>
       </div>
+
+      <Card className="p-4">
+        <CardHeader>
+          <CardTitle>Template</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Button variant={template==='modern'? 'default':'outline'} onClick={() => setTemplate('modern')}>Modern</Button>
+            <Button variant={template==='classic'? 'default':'outline'} onClick={() => setTemplate('classic')}>Classic</Button>
+            <Button variant={template==='executive'? 'default':'outline'} onClick={() => setTemplate('executive')}>Executive</Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Resume Sections */}
       <div className="space-y-6">
@@ -153,7 +177,7 @@ export function PreviewStep({ optimizedResume, onOptimizedResumeChange }: Previe
         {/* Professional Summary */}
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="uppercase">Professional Summary</CardTitle>
+            <CardTitle className={sectionTitleClass}>Professional Summary</CardTitle>
             <Button
               variant="outline"
               size="sm"
@@ -195,7 +219,7 @@ export function PreviewStep({ optimizedResume, onOptimizedResumeChange }: Previe
         {/* Professional Experience */}
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="uppercase">Professional Experience</CardTitle>
+            <CardTitle className={sectionTitleClass}>Professional Experience</CardTitle>
             <Button
               variant="outline"
               size="sm"
@@ -270,7 +294,7 @@ export function PreviewStep({ optimizedResume, onOptimizedResumeChange }: Previe
         {/* Education */}
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="uppercase">Education</CardTitle>
+            <CardTitle className={sectionTitleClass}>Education</CardTitle>
             <Button
               variant="outline"
               size="sm"
@@ -347,7 +371,7 @@ export function PreviewStep({ optimizedResume, onOptimizedResumeChange }: Previe
         {/* Additional Information */}
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="uppercase">Additional Information</CardTitle>
+            <CardTitle className={sectionTitleClass}>Additional Information</CardTitle>
             <Button
               variant="outline"
               size="sm"
@@ -415,5 +439,5 @@ export function PreviewStep({ optimizedResume, onOptimizedResumeChange }: Previe
         </Card>
       </div>
     </div>
-  )
-}
+   )
+ }

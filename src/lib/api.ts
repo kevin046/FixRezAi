@@ -13,6 +13,7 @@ You are a world-class resume writer and career coach with a deep understanding o
 **Target Job:** {jobTitle}
 **Job Description:** {jobDescription}
 **User Resume:** {resumeText}
+**Preferences:** Tone={tone}, Industry={industry}, Style={style}, ATS Level={atsLevel}
 
 **JSON Output Structure:**
 Return ONLY a valid JSON object in the following format, using the data extracted and enhanced from the resume:
@@ -60,7 +61,8 @@ export async function optimizeResume(
     jobTitle: request.jobTitle,
     jobDescriptionLength: request.jobDescription.length,
     resumeTextLength: request.resumeText.length,
-    resumeTextPreview: request.resumeText.substring(0, 300) + '...'
+    resumeTextPreview: request.resumeText.substring(0, 300) + '...',
+    options: request.options
   });
 
   // Validate input data before making API call
@@ -132,30 +134,17 @@ export async function optimizeResume(
       }
     }, 180000);
 
-    // Starting AI optimization (reduced logging)
-
     // Start timer for progress tracking
     const startTime = Date.now();
     
     if (onProgress) {
       progressInterval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        // Removed console logging to eliminate spam - only call progress callback
         onProgress(elapsed);
       }, 1000);
     }
 
-    // Add signal abort listener for debugging
-    controller.signal.addEventListener('abort', () => {
-      // Removed debug log to reduce console spam
-    });
-
-    // Determine API base:
-    // 1) Use env var if present
-    // 2) Use window.__VITE_API_BASE_URL if provided by index.html
-    // 3) In localhost, use canonical domain + '/api'
-    // 4) In production, use current origin + '/api'
-    // 5) Fallback to same-origin '/api/optimize'
+    // Determine API base
     let apiBase = ''
     try {
       const envBase = (import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined
@@ -166,12 +155,11 @@ export async function optimizeResume(
       } else if (typeof window !== 'undefined') {
         const host = window.location.hostname
         const isLocal = host === 'localhost' || host === '127.0.0.1'
+        
         if (isLocal) {
-          const canonicalEl = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null
-          const canonicalOrigin = canonicalEl?.href ? new URL(canonicalEl.href).origin : null
-          if (canonicalOrigin) {
-            apiBase = `${canonicalOrigin}/api`.replace(/\/$/, '')
-          }
+          apiBase = 'http://localhost:3001/api'
+        } else if (host.includes('fixrez.com')) {
+          apiBase = 'https://fixrez.com/api'
         } else {
           apiBase = `${window.location.origin}/api`.replace(/\/$/, '')
         }
@@ -196,6 +184,16 @@ export async function optimizeResume(
       headers['Authorization'] = `Bearer ${accessToken}`
     }
 
+    // Build prompt from OPTIMIZATION_PROMPT and options
+    const prompt = OPTIMIZATION_PROMPT
+      .replace('{jobTitle}', request.jobTitle)
+      .replace('{jobDescription}', request.jobDescription)
+      .replace('{resumeText}', request.resumeText)
+      .replace('{tone}', request.options?.tone || 'Professional')
+      .replace('{industry}', request.options?.industry || 'Tech')
+      .replace('{style}', request.options?.style || 'Achievement-focused')
+      .replace('{atsLevel}', request.options?.atsLevel || 'Advanced')
+
     // Making fetch request to optimize endpoint
     const response = await fetch(url, {
       method: 'POST',
@@ -203,14 +201,13 @@ export async function optimizeResume(
       body: JSON.stringify({
         jobTitle: request.jobTitle,
         jobDescription: request.jobDescription,
-        resumeText: request.resumeText
+        resumeText: request.resumeText,
+        options: request.options,
+        prompt,
       }),
-      signal: controller.signal, // Add abort signal
+      signal: controller.signal,
     });
 
-    // Response received (reduced logging)
-
-    // Clear all timers and intervals on successful completion
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = null;
@@ -222,8 +219,6 @@ export async function optimizeResume(
 
     if (!response.ok) {
       console.error('❌ HTTP error response:', response.status, response.statusText, 'URL:', url);
-      
-      // Try to extract the user-friendly error message from the response body
       try {
         const errorData = await response.json();
         const details = errorData.details ? ` Details: ${errorData.details}` : ''
@@ -231,17 +226,13 @@ export async function optimizeResume(
           throw new Error(`${errorData.error}.${details}`.trim());
         }
       } catch (jsonError) {
-        // If we can't parse JSON, fall back to generic error
         console.warn('Could not parse error response as JSON:', jsonError);
       }
-      
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const data = await response.json();
     console.log('✅ AI optimization completed successfully!');
-    
-    // 🔍 RAW AI RESPONSE DEBUGGING
     console.log('🔍 API: RAW AI Response (complete):', JSON.stringify(data, null, 2));
     console.log('🔍 API: Response structure analysis:', {
       hasSuccess: 'success' in data,
@@ -250,7 +241,6 @@ export async function optimizeResume(
       dataType: typeof data.data,
     });
 
-    // Validate the response structure
     if (data.success && data.data) {
       return {
         success: true,
@@ -265,21 +255,15 @@ export async function optimizeResume(
     }
   } catch (error) {
     console.error('💥 Optimization error:', error);
-    
-    // Cleanup on error
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
     if (progressInterval) {
       clearInterval(progressInterval);
     }
-    
-    // Handle specific abort errors with better identification
     if (error instanceof Error && error.name === 'AbortError') {
       const reason = controller?.signal.reason || 'Unknown reason';
       console.log('🚫 Request was aborted:', reason);
-      
-      // Check if it was a timeout or other abort reason
       if (reason.includes('timeout') || reason.includes('180 seconds')) {
         return {
           success: false,
@@ -292,8 +276,6 @@ export async function optimizeResume(
         };
       }
     }
-    
-    // Handle network errors
     if (error instanceof Error && error.message.includes('fetch')) {
       return {
         success: false,

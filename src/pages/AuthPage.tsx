@@ -38,7 +38,9 @@ export default function AuthPage() {
             >
               ← Back
             </button>
-            <a href="/" className="font-semibold text-slate-900 dark:text-white">FixRez AI</a>
+            <a href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              FixRez AI
+            </a>
           </div>
           {/* Removed Settings and Logout for unauthenticated header */}
         </div>
@@ -74,7 +76,7 @@ export default function AuthPage() {
                 {mode === 'login' ? (
                   <LoginForm />
                 ) : (
-                  <RegisterForm />
+                  <RegisterForm onToggle={() => setMode('login')} />
                 )}
 
                 <p className="text-xs text-slate-500 dark:text-gray-400 text-center">

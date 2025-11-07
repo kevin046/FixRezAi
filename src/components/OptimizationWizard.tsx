@@ -14,6 +14,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { isVerified, resendVerification } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { secureLogout } from '@/lib/auth'
+import { AIOptionsStep } from './wizard/AIOptionsStep'
+import type { AIOptions } from '@/types/resume'
+import { useResumeStore } from '@/stores/resumeStore'
 
 interface OptimizationWizardProps {
   onBack: () => void
@@ -30,14 +33,16 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
   const { user, logout, hydrated } = useAuthStore()
   const verified = isVerified(user)
   const [resendStatus, setResendStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [aiOptions, setAIOptions] = useState<AIOptions>({ tone: 'Professional', industry: 'Tech', style: 'Achievement-focused', atsLevel: 'Advanced' })
 
   const steps = [
     { id: 1, title: 'Job Title', description: 'What position are you targeting?' },
     { id: 2, title: 'Job Description', description: 'Paste the job posting' },
     { id: 3, title: 'Resume Upload', description: 'Upload your current resume' },
-    { id: 4, title: 'AI Processing', description: 'AI optimizes your resume' },
-    { id: 5, title: 'Preview', description: 'Review optimized content' },
-    { id: 6, title: 'Export', description: 'Download your resume' }
+    { id: 4, title: 'AI Options', description: 'Configure AI preferences' },
+    { id: 5, title: 'AI Processing', description: 'AI optimizes your resume' },
+    { id: 6, title: 'Preview', description: 'Review optimized content' },
+    { id: 7, title: 'Export', description: 'Download your resume' }
   ]
 
   const canProceed = () => {
@@ -49,10 +54,12 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
       case 3:
         return resumeFile !== null || resumeText.trim().length > 100
       case 4:
-        return optimizedResume !== null
-      case 5:
         return true
+      case 5:
+        return optimizedResume !== null
       case 6:
+        return true
+      case 7:
         return true
       default:
         return false
@@ -62,12 +69,76 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
   const handleNext = () => {
     if (!canProceed()) return
     // Gate AI processing for unverified accounts
-    if (currentStep === 3 && !verified) {
+    if (currentStep === 4 && !verified) {
       setResendStatus({ type: 'error', message: 'Please verify your email to use AI optimization.' })
       return
     }
-    if (currentStep < 6) {
+    if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1)
+    }
+  }
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <JobTitleStep
+            jobTitle={jobTitle}
+            onJobTitleChange={setJobTitle}
+          />
+        )
+      case 2:
+        return (
+          <JobDescriptionStep
+            jobDescription={jobDescription}
+            onJobDescriptionChange={setJobDescription}
+          />
+        )
+      case 3:
+        return (
+          <ResumeUploadStep
+            resumeFile={resumeFile}
+            resumeText={resumeText}
+            onResumeFileChange={setResumeFile}
+            onResumeTextChange={setResumeText}
+          />
+        )
+      case 4:
+        return (
+          <AIOptionsStep
+            options={aiOptions}
+            onOptionsChange={setAIOptions}
+          />
+        )
+      case 5:
+        return (
+          <ProcessingStep
+            jobTitle={jobTitle}
+            jobDescription={jobDescription}
+            resumeFile={resumeFile}
+            resumeText={resumeText}
+            isProcessing={isProcessing}
+            onProcessingStart={handleProcessingStart}
+            onProcessingComplete={handleProcessingComplete}
+            onProcessingError={handleProcessingError}
+            options={aiOptions}
+          />
+        )
+      case 6:
+        return (
+          <PreviewStep
+            optimizedResume={optimizedResume}
+            onOptimizedResumeChange={setOptimizedResume}
+          />
+        )
+      case 7:
+        return (
+          <ExportStep
+            optimizedResume={optimizedResume}
+          />
+        )
+      default:
+        return null
     }
   }
 
@@ -82,6 +153,8 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
     setIsProcessing(true)
   }
 
+  const { setOptimizedResume: setOptimizedResumeGlobal } = useResumeStore()
+
   const handleProcessingComplete = (result: OptimizedResume) => {
     console.log('🎯 OptimizationWizard: handleProcessingComplete called with result:', result);
     console.log('📊 Result structure:', {
@@ -95,9 +168,12 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
     const enhancedResume = expandEmployerNames(result);
 
     setOptimizedResume(enhancedResume)
+    // Update global store for ATS Rating and other components
+    try { setOptimizedResumeGlobal(enhancedResume) } catch {}
+
     setIsProcessing(false)
-    console.log('🔄 OptimizationWizard: Moving to step 5 (Preview)');
-    setCurrentStep(5)
+    console.log('🔄 OptimizationWizard: Moving to step 6 (Preview)');
+    setCurrentStep(6)
   }
 
   const expandEmployerNames = (resume: OptimizedResume): OptimizedResume => {
@@ -142,69 +218,6 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
       window.location.replace('/?logout=1')
     } else {
       window.location.replace('/?logout_error=1')
-    }
-  }
-
-  const renderStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <JobTitleStep
-            jobTitle={jobTitle}
-            onJobTitleChange={setJobTitle}
-          />
-        )
-      case 2:
-        return (
-          <JobDescriptionStep
-            jobDescription={jobDescription}
-            onJobDescriptionChange={setJobDescription}
-          />
-        )
-      case 3:
-        return (
-          <ResumeUploadStep
-            resumeFile={resumeFile}
-            resumeText={resumeText}
-            onResumeFileChange={setResumeFile}
-            onResumeTextChange={setResumeText}
-          />
-        )
-      case 4:
-        console.log('🎯 OptimizationWizard: Rendering ProcessingStep with:', {
-          currentStep,
-          hasJobTitle: !!jobTitle,
-          hasJobDescription: !!jobDescription,
-          hasResumeText: !!resumeText,
-          isProcessing
-        });
-        return (
-          <ProcessingStep
-            jobTitle={jobTitle}
-            jobDescription={jobDescription}
-            resumeFile={resumeFile}
-            resumeText={resumeText}
-            isProcessing={isProcessing}
-            onProcessingStart={handleProcessingStart}
-            onProcessingComplete={handleProcessingComplete}
-            onProcessingError={handleProcessingError}
-          />
-        )
-      case 5:
-        return (
-          <PreviewStep
-            optimizedResume={optimizedResume}
-            onOptimizedResumeChange={setOptimizedResume}
-          />
-        )
-      case 6:
-        return (
-          <ExportStep
-            optimizedResume={optimizedResume}
-          />
-        )
-      default:
-        return null
     }
   }
 
@@ -356,10 +369,10 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
             Previous
           </Button>
           
-          {currentStep < 6 && (
+          {currentStep < steps.length && currentStep !== 5 && (
             <Button
               onClick={handleNext}
-              disabled={!canProceed() || isProcessing || (!verified && currentStep === 3)}
+              disabled={!canProceed() || isProcessing || (!verified && currentStep === 4)}
               className="w-full sm:w-auto"
             >
               Next

@@ -4,8 +4,11 @@ import { Card } from '../ui/card'
 import { Progress } from '../ui/progress'
 import { Sparkles, Brain, FileText, CheckCircle, AlertCircle, RefreshCw, Clock } from 'lucide-react'
 import { optimizeResume } from '../../lib/api'
+import { logOptimization } from '@/lib/analytics'
 import { parseFile } from '../../lib/fileParser'
 import type { OptimizedResume } from '../../types/resume'
+import type { AIOptions } from '@/types/resume'
+import { calculateATSScore, ATSScore } from '@/lib/atsScoring'
 
 interface ProcessingStepProps {
   jobTitle: string
@@ -16,6 +19,7 @@ interface ProcessingStepProps {
   onProcessingStart: () => void
   onProcessingComplete: (result: OptimizedResume) => void
   onProcessingError: (error: string) => void
+  options?: AIOptions
 }
 
 export function ProcessingStep({
@@ -26,7 +30,8 @@ export function ProcessingStep({
   isProcessing,
   onProcessingStart,
   onProcessingComplete,
-  onProcessingError
+  onProcessingError,
+  options
 }: ProcessingStepProps) {
   // Component rendered (reduced logging)
 
@@ -36,11 +41,12 @@ export function ProcessingStep({
   const [hasStarted, setHasStarted] = useState(false)
   const [elapsedTime, setElapsedTime] = useState(0)
   const [retryCount, setRetryCount] = useState(0)
+  const [atsScore, setATSScore] = useState<ATSScore | null>(null)
   
   // Use ref to track component mount status and prevent state updates after unmount
   const isMountedRef = useRef(true)
   const processingAbortControllerRef = useRef<AbortController | null>(null)
-  
+  const startTimeRef = useRef<number>(0)
   // Ensure isMountedRef is set to true on mount
   useEffect(() => {
     isMountedRef.current = true
@@ -60,6 +66,26 @@ export function ProcessingStep({
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  const tokenize = (text: string): string[] => {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+  }
+
+  const extractKeywords = (jd: string): string[] => {
+    const words = tokenize(jd)
+    const stop = new Set(['the','and','for','with','a','an','to','of','in','on','at','by','is','are','as','be','or','from','that','this'])
+    const counts: Record<string, number> = {}
+    for (const w of words) {
+      if (w.length < 3 || stop.has(w)) continue
+      counts[w] = (counts[w] || 0) + 1
+    }
+    const sorted = Object.keys(counts).sort((a,b) => counts[b]-counts[a])
+    return sorted.slice(0, 25)
+  }
+
   const startProcessing = async () => {
     if (isProcessing || hasStarted || !isMountedRef.current) return
     
@@ -71,6 +97,7 @@ export function ProcessingStep({
     setError(null)
     setProgress(0)
     setElapsedTime(0)
+    startTimeRef.current = Date.now()
 
     try {
       // Step 1: Parse resume
@@ -78,84 +105,41 @@ export function ProcessingStep({
       setCurrentTask('Parsing Resume')
       setProgress(25)
       
-      console.log('🔍 ProcessingStep: Starting resume parsing with:', {
-        hasResumeFile: !!resumeFile,
-        resumeFileName: resumeFile?.name,
-        resumeFileType: resumeFile?.type,
-        resumeFileSize: resumeFile?.size,
-        hasResumeText: !!resumeText,
-        resumeTextLength: resumeText.length,
-        resumeTextPreview: resumeText.substring(0, 100) + '...'
-      });
-      
       let extractedText = resumeText
       if (resumeFile) {
-        console.log('📄 ProcessingStep: Parsing uploaded file...');
         try {
           extractedText = await parseFile(resumeFile)
-          console.log('✅ ProcessingStep: File parsing successful:', {
-            extractedTextLength: extractedText.length,
-            extractedTextPreview: extractedText.substring(0, 200) + '...'
-          });
         } catch (parseError) {
-          console.error('❌ ProcessingStep: File parsing failed:', parseError);
-          throw parseError;
+          throw parseError
         }
-      } else {
-        console.log('📝 ProcessingStep: Using provided resume text');
       }
 
       // Validate extracted text
       if (!extractedText || extractedText.trim().length === 0) {
-        console.error('❌ ProcessingStep: No resume content found');
-        throw new Error('No resume content found. Please upload a valid resume file or paste your resume text.');
+        throw new Error('No resume content found. Please upload a valid resume file or paste your resume text.')
       }
 
       const trimmedText = extractedText.trim();
-      console.log('🔍 ProcessingStep: Resume content validation:', {
-        originalLength: extractedText.length,
-        trimmedLength: trimmedText.length,
-        hasMinimumLength: trimmedText.length >= 50,
-        contentPreview: trimmedText.substring(0, 300) + '...'
-      });
-
       if (trimmedText.length < 50) {
-        console.error('❌ ProcessingStep: Resume content too short');
-        throw new Error('Resume content is too short. Please provide a more detailed resume.');
+        throw new Error('Resume content is too short. Please provide a more detailed resume.')
       }
 
       // Step 2: Analyze job requirements
       if (!isMountedRef.current) return
       setCurrentTask('Analyzing Job Requirements')
       setProgress(50)
-      
-      console.log('🎯 ProcessingStep: Analyzing job requirements:', {
-        jobTitle: jobTitle,
-        jobDescriptionLength: jobDescription.length,
-        jobDescriptionPreview: jobDescription.substring(0, 200) + '...'
-      });
-      
-      // Simulate analysis time
-      await new Promise(resolve => setTimeout(resolve, 1000))
 
       // Step 3: AI Processing
       if (!isMountedRef.current) return
       setCurrentTask('AI Processing')
       setProgress(75)
       
-      console.log('🧠 ProcessingStep: Starting AI optimization with:', {
-        jobTitle: jobTitle,
-        jobDescriptionLength: jobDescription.length,
-        resumeTextLength: extractedText.length,
-        resumeContentSample: extractedText.substring(0, 500) + '...'
-      });
-      
       const optimizationResult = await optimizeResume({
         jobTitle,
         jobDescription,
-        resumeText: extractedText
+        resumeText: trimmedText,
+        options
       }, (elapsed) => {
-        // Only update elapsed time if component is still mounted
         if (isMountedRef.current) {
           setElapsedTime(elapsed)
         }
@@ -164,31 +148,30 @@ export function ProcessingStep({
       if (!isMountedRef.current) return
 
       if (optimizationResult.success && optimizationResult.data) {
-        const hasParseWarning = !!(optimizationResult.data as any).warning && (optimizationResult.data as any).warning.includes('parse failure');
-        if (hasParseWarning) {
-          console.warn('⚠️ ProcessingStep: AI parse warning, proceeding with fallback data:', (optimizationResult.data as any).warning);
-        }
         const validatedResume = validateAndSanitize(optimizationResult.data as OptimizedResume);
         if (validatedResume) {
-          console.log('✅ ProcessingStep: Optimization successful' + (hasParseWarning ? ' (with warnings)' : '') + ', proceeding to finalize...');
+          // Compute ATS score using shared scoring util to match ATSRating
+          const score = calculateATSScore(validatedResume)
+          if (isMountedRef.current) setATSScore(score)
+
+          logOptimization({ id: crypto.randomUUID(), ts: Date.now(), jobTitle, status: 'success', durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) })
           onProcessingComplete(validatedResume);
         } else {
           throw new Error('AI response validation failed. Retrying...');
         }
       } else {
+        logOptimization({ id: crypto.randomUUID(), ts: Date.now(), jobTitle, status: 'error', durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) })
         throw new Error(optimizationResult.error || 'Optimization failed');
       }
     } catch (err) {
-      console.error('❌ ProcessingStep: Processing error:', err)
       if (isMountedRef.current) {
         const rawMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
-        // Provide clearer message for 500 responses and common configuration issues
         const normalized = rawMessage.toLowerCase()
         let title = 'Processing Failed'
         let message = rawMessage
         if (normalized.includes('http error') && normalized.includes('500')) {
           title = 'Server Error (500)'
-          message = 'The AI API endpoint returned a 500 error. This usually indicates a server configuration issue (e.g., missing or invalid API key, model misconfiguration, or malformed request). Please try again, and if it persists, check server logs and environment variables.'
+          message = 'The AI API endpoint returned a 500 error. Please try again later.'
         }
         if (normalized.includes('network')) {
           title = 'Network Error'
@@ -197,32 +180,25 @@ export function ProcessingStep({
 
         if (retryCount < 3) {
           setRetryCount(retryCount + 1);
-          setTimeout(() => startProcessing(), 3000); // Retry after 3 seconds
+          setTimeout(() => startProcessing(), 3000)
         } else {
           setError({ title, message })
           onProcessingError(rawMessage)
+          logOptimization({ id: crypto.randomUUID(), ts: Date.now(), jobTitle, status: 'error', durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) })
         }
       }
     } finally {
-      // Clean up the abort controller
       processingAbortControllerRef.current = null
     }
   }
 
   const validateAndSanitize = (resume: OptimizedResume): OptimizedResume | null => {
-    // Basic validation checks
     if (!resume.header || !resume.summary || !resume.experience || !resume.education) {
-      console.error('Validation Error: Missing required sections');
       return null;
     }
-
     if (typeof resume.header.name !== 'string' || resume.header.name.trim() === '') {
-      console.error('Validation Error: Invalid header name');
       return null;
     }
-
-    // Add more validation and sanitization rules as needed
-
     return resume;
   }
 
@@ -234,6 +210,7 @@ export function ProcessingStep({
     setCurrentTask('')
     setElapsedTime(0)
     setRetryCount(0)
+    setATSScore(null)
   }
 
   useEffect(() => {
@@ -242,7 +219,6 @@ export function ProcessingStep({
     const hasValidJobTitle = jobTitle.trim().length > 0
     
     if (!hasStarted && !isProcessing && isMountedRef.current && hasValidResumeContent && hasValidJobDescription && hasValidJobTitle) {
-      // Auto-start processing when component mounts
       const timer = setTimeout(() => {
         if (isMountedRef.current) {
           startProcessing()
@@ -252,13 +228,9 @@ export function ProcessingStep({
     }
   }, [hasStarted, isProcessing, resumeText, resumeFile, jobDescription, jobTitle])
 
-  // Cleanup effect for component unmounting
   useEffect(() => {
     return () => {
-      // Mark component as unmounted
       isMountedRef.current = false
-      
-      // Abort any ongoing processing
       if (processingAbortControllerRef.current) {
         processingAbortControllerRef.current.abort('Component unmounted')
         processingAbortControllerRef.current = null
@@ -311,7 +283,6 @@ export function ProcessingStep({
           Our AI is analyzing the job requirements and tailoring your resume for maximum impact.
         </p>
         
-        {/* Processing Timer */}
         {elapsedTime > 0 && (
           <div className="flex items-center justify-center gap-2 mt-4 text-sm text-gray-500 dark:text-gray-400">
             <Clock className="w-4 h-4" />
@@ -320,9 +291,30 @@ export function ProcessingStep({
         )}
       </div>
 
+      {atsScore && (
+        <Card className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">ATS Compatibility Score</div>
+              <div className="text-3xl font-bold text-gray-900 dark:text-white">{atsScore.totalScore}%</div>
+              <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                Parse {atsScore.categories.parseRate.score}% • Impact {atsScore.categories.quantifyingImpact.score}% • Repetition {atsScore.categories.repetition.score}% • Spelling & Grammar {atsScore.categories.spellingGrammar.score}%
+              </div>
+            </div>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-900 dark:text-white mb-2">Feedback</div>
+              <ul className="text-sm text-gray-700 dark:text-gray-300 list-disc pl-5 space-y-1">
+                {atsScore.feedback.length > 0 ? atsScore.feedback.map((s, i) => (<li key={i}>{s}</li>)) : (
+                  <li>Your resume aligns well with the ATS criteria.</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Card className="p-6">
         <div className="space-y-6">
-          {/* Overall Progress */}
           <div>
             <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300 mb-2">
               <span>{currentTask || 'Preparing...'}</span>
@@ -331,7 +323,6 @@ export function ProcessingStep({
             <Progress value={progress} className="mb-4" />
           </div>
 
-          {/* Processing Steps */}
           <div className="space-y-4">
             {processingSteps.map((step) => {
               const isActive = currentTask === step.title

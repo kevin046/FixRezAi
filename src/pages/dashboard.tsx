@@ -1,0 +1,251 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { PieChart, BarChart2, Search, ArrowLeft, Target } from 'lucide-react'
+import { getOptimizationHistory, type OptimizationEvent } from '@/lib/analytics'
+import { getExportStats } from '@/lib/analytics'
+import LogoutButton from '@/components/LogoutButton'
+import { useAuthStore } from '@/stores/authStore'
+import { isVerified } from '@/lib/auth'
+import { useResumeStore } from '@/stores/resumeStore'
+import { calculateATSScore, ATSScore } from '@/lib/atsScoring'
+
+export default function DashboardPage() {
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'success' | 'error'>('all')
+  const [history, setHistory] = useState<OptimizationEvent[]>([])
+  const { user } = useAuthStore()
+  const verified = user ? isVerified(user) : false
+  const optimizedResume = useResumeStore((s) => s.optimizedResume)
+  const [atsScore, setATSScore] = useState<ATSScore | null>(null)
+
+  useEffect(() => {
+    setHistory(getOptimizationHistory())
+  }, [])
+
+  useEffect(() => {
+    if (optimizedResume) {
+      try {
+        const score = calculateATSScore(optimizedResume)
+        setATSScore(score)
+      } catch { setATSScore(null) }
+    } else {
+      setATSScore(null)
+    }
+  }, [optimizedResume])
+
+  const filtered = useMemo(() => {
+    return history.filter(h => {
+      if (statusFilter !== 'all' && h.status !== statusFilter) return false
+      if (query && !h.jobTitle.toLowerCase().includes(query.toLowerCase())) return false
+      return true
+    })
+  }, [history, query, statusFilter])
+
+  const exportStats = getExportStats()
+  const exportFormats = ['pdf','text','json','linkedin']
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      window.history.back()
+    } else {
+      window.location.href = '/'
+    }
+  }
+
+  const navigateToWizard = () => {
+    // Use global event so App can apply verification gating
+    window.dispatchEvent(new Event('navigate-to-upload'))
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Navigation Bar (from index) */}
+      <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleBack}
+                aria-label="Go back"
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center gap-1"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+              <a href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                FixRez AI
+              </a>
+            </div>
+            <div className="flex items-center space-x-4">
+              {user ? (
+                <>
+                  <span className="text-gray-700 dark:text-gray-300">
+                    Welcome, {user.email?.split('@')[0]}
+                  </span>
+                  <span className={`px-2 py-1 text-xs rounded-full border ${verified ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>
+                    {verified ? 'Verified' : 'Not Verified'}
+                  </span>
+                  <a
+                    href="/settings"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    Settings
+                  </a>
+                  <LogoutButton className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" />
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { window.location.href = '/auth?mode=login' }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    Login
+                  </button>
+                  <button
+                    onClick={() => { window.location.href = '/auth?mode=register' }}
+                    className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                  >
+                    Register
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Your Dashboard</h1>
+              <p className="text-gray-600 dark:text-gray-300">Track your optimizations, exports, and ATS performance</p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={navigateToWizard} className="bg-gradient-to-r from-blue-600 to-purple-600">Optimize Resume</Button>
+              <a href="/contact" className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition">Contact</a>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <Search className="w-5 h-5 text-gray-500"/>
+                <Input
+                  placeholder="Filter by job title"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant={statusFilter==='all' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('all')}>All</Button>
+                <Button variant={statusFilter==='success' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('success')}>Success</Button>
+                <Button variant={statusFilter==='error' ? 'default' : 'outline'} size="sm" onClick={() => setStatusFilter('error')}>Error</Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Top Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg"><PieChart className="w-5 h-5"/> Export Total</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{exportStats.total}</div>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Across formats</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg"><BarChart2 className="w-5 h-5"/> Success Rate</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{history.length ? Math.round((history.filter(h=>h.status==='success').length / history.length) * 100) : 0}%</div>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Optimizations completed</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg"><Target className="w-5 h-5"/> ATS Score</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {atsScore ? (
+                <div>
+                  <div className="text-3xl font-bold">{atsScore.totalScore}</div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Parse {atsScore.categories.parseRate.score}% • Impact {atsScore.categories.quantifyingImpact.score}%</p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600 dark:text-gray-300">No optimized resume yet. Run optimization to see ATS score.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Export stats */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-lg">Export Formats</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {exportFormats.map(fmt => (
+                <div key={fmt} className="p-4 rounded-lg border bg-white dark:bg-gray-800">
+                  <div className="text-2xl font-bold">{exportStats.counts[fmt] || 0}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300 capitalize">{fmt}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Optimization history */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Optimization History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {filtered.map((h, i) => (
+                <div key={i} className="p-4 rounded-lg border bg-white dark:bg-gray-800">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-medium">{h.jobTitle}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-300">{new Date(h.ts).toLocaleString()}</div>
+                    </div>
+                    <div className={`text-sm ${h.status === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{h.status}</div>
+                  </div>
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div className="text-sm text-gray-600 dark:text-gray-300">No history found for current filters.</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Footer (from index) */}
+      <footer className="py-10 border-t border-gray-200 dark:border-gray-700 mt-8">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">© 2025 Summit Pixels Inc.</p>
+            <div className="flex items-center gap-6 text-sm">
+              <a href="/terms" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Terms</a>
+              <a href="/privacy" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Privacy</a>
+              <a href="/contact" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Contact</a>
+              <span className="text-gray-400">•</span>
+              <span className="text-gray-600 dark:text-gray-300">Powered by Summit Pixels Inc.</span>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}

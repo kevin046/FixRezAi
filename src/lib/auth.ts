@@ -9,6 +9,11 @@ export function isVerified(user: User | null): boolean {
 const RESEND_KEY = 'fixrez_resend_verification_at'
 const RESEND_COOLDOWN_MS = 60_000
 
+// Guard variables for verified metadata sync
+const SYNC_KEY = 'fixrez_verified_sync_at'
+const SYNC_COOLDOWN_MS = 60_000 // 1 minute backoff to avoid 429s
+let syncInFlight = false
+
 export async function resendVerification(email: string): Promise<{ success: boolean; message: string }> {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { success: false, message: 'Please enter a valid email address.' }
@@ -39,18 +44,50 @@ export async function resendVerification(email: string): Promise<{ success: bool
 }
 
 export async function syncVerifiedMetadata(): Promise<void> {
+  // Concurrency guard
+  if (syncInFlight) return
+  const now = Date.now()
+  const last = Number(localStorage.getItem(SYNC_KEY) || '0')
+  if (now - last < SYNC_COOLDOWN_MS) return
+
+  syncInFlight = true
   try {
     const { data: { user } } = await supabase.auth.getUser()
-    if (user && user.email_confirmed_at) {
-      // Write a simple metadata flag for client/server checks
-      try { await supabase.auth.updateUser({ data: { verified: true } }) } catch {}
-      // Also upsert into profiles table for server-side checks
+    if (!user) return
+
+    // Only proceed if email is confirmed
+    if (!user.email_confirmed_at) return
+
+    const alreadyVerified = user.user_metadata?.verified === true
+    if (alreadyVerified) {
+      // No-op if metadata already reflects verification
+      localStorage.setItem(SYNC_KEY, String(now))
+      return
+    }
+
+    // Update auth user metadata once, with error handling
+    const { error: updateErr } = await supabase.auth.updateUser({ data: { verified: true } })
+    if (updateErr) {
+      const msg = (updateErr.message || '').toLowerCase()
+      if (msg.includes('too many') || msg.includes('rate')) {
+        // Backoff on rate-limit and record last-attempt timestamp
+        localStorage.setItem(SYNC_KEY, String(now))
+      }
+      console.warn('syncVerifiedMetadata updateUser error:', updateErr.message)
+    } else {
+      // Upsert profiles only after successful metadata update to avoid extra writes
       try {
         await supabase.from('profiles').upsert({ id: user.id, verified: true, updated_at: new Date().toISOString() }, { onConflict: 'id' })
-      } catch {}
+      } catch (e) {
+        console.warn('profiles upsert error:', e instanceof Error ? e.message : e)
+      }
+      // Record last sync time to avoid immediate repeats
+      localStorage.setItem(SYNC_KEY, String(now))
     }
   } catch (e) {
     console.warn('syncVerifiedMetadata error:', e)
+  } finally {
+    syncInFlight = false
   }
 }
 

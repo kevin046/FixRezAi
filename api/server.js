@@ -9,11 +9,39 @@ import path from 'path'
 dotenv.config({ path: '.env.local' });
 
 // Import serverless-style handlers and adapt to Express
-import optimizeHandler from './optimize.js';
+import optimizeHandler, { AI_STATUS } from './optimize.js';
 import contactHandler from './contact.js';
 
 const app = express();
-app.use(cors());
+// Strengthen CORS: allow localhost dev and deployed domains
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,https://fixrez-han4cbj05-kevin046s-projects.vercel.app,https://fixrez.com,https://www.fixrez.com')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean)
+
+// Dev bypass flag
+const DEV_AUTH_BYPASS = (String(process.env.DEV_AUTH_BYPASS || '').toLowerCase() === 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY
+console.log('🔧 DEV_AUTH_BYPASS:', DEV_AUTH_BYPASS ? 'enabled' : 'disabled')
+
+const corsOptions = {
+  origin: function(origin, callback) {
+    // Allow same-origin or server-to-server
+    if (!origin) return callback(null, true)
+    // Allow any localhost/127.0.0.1 port for dev
+    const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
+    if (isLocalhost) return callback(null, true)
+    // Explicit allowlist for production domains
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    return callback(new Error('Not allowed by CORS'))
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+}
+app.use(cors(corsOptions))
+// Express v5 path-to-regexp doesn't accept '*' route; use regex
+app.options(/.*/, cors(corsOptions))
 app.use(express.json({ limit: '1mb' }));
 
 // Simple health check
@@ -21,6 +49,21 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
 });
 
+// Status endpoint: show AI rate limit and model state
+app.get('/api/status', (req, res) => {
+  res.json({
+    success: true,
+    ai: {
+      model: AI_STATUS.model,
+      last429: AI_STATUS.last429 ? new Date(AI_STATUS.last429).toISOString() : null,
+      lastOk: AI_STATUS.lastOk ? new Date(AI_STATUS.lastOk).toISOString() : null,
+      lastCall: AI_STATUS.lastCall ? new Date(AI_STATUS.lastCall).toISOString() : null,
+      cooldownUntil: AI_STATUS.cooldownUntil ? new Date(AI_STATUS.cooldownUntil).toISOString() : null,
+      active: AI_STATUS.active,
+      queue: AI_STATUS.queue
+    }
+  })
+})
 // Wrap the Vercel-style handler(req, res) for Express
 function wrap(handler) {
   return async (req, res) => {
@@ -78,6 +121,13 @@ function rateLimiter(req, res, next) {
 
 // Middleware: require verified Supabase user
 function requireVerified(req, res, next) {
+  // Dev bypass: allow requests without verification when enabled
+  if (DEV_AUTH_BYPASS) {
+    console.log('🔓 DEV bypass active: skipping user verification for', req.path)
+    req.user = { id: 'dev-user', email: 'dev@localhost', email_confirmed_at: new Date().toISOString(), user_metadata: { verified: true } }
+    return next()
+  }
+
   const auth = req.headers['authorization'] || ''
   const m = auth.match(/^Bearer\s+(.*)$/i)
   const token = m ? m[1] : null
@@ -155,8 +205,8 @@ app.post('/api/contact', ipAllowlist, rateLimiter, wrap(contactHandler));
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`🔌 Dev API server running at http://localhost:${PORT}`);
-  console.log('➡ Routes:');
+  console.log(`\ud83d\udd0c Dev API server running at http://localhost:${PORT}`);
+  console.log('\u27a1 Routes:');
   console.log('   GET  /api/me');
   console.log('   POST /api/optimize');
   console.log('   POST /api/contact');

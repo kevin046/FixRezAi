@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage'
 import ContactPage from './pages/contact'
 import SettingsPage from './pages/settings'
 import VerifyPage from './pages/verify'
+import DashboardPage from './pages/dashboard'
 import { useAuthStore } from './stores/authStore'
 import { supabase } from './lib/supabase'
 import { secureLogout, isVerified, syncVerifiedMetadata } from './lib/auth'
@@ -15,7 +16,7 @@ function App() {
   const { user, setUser, logout } = useAuthStore()
   
   // Check URL path to determine initial view
-  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' => {
+  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' => {
     const path = window.location.pathname
     if (path === '/optimize') {
       return 'wizard'
@@ -38,14 +39,17 @@ function App() {
     if (path === '/verify') {
       return 'verify'
     }
+    if (path === '/dashboard') {
+      return 'dashboard'
+    }
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify'>(
+  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard'>(
     getInitialView()
   )
 
-  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify') => {
+  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard') => {
     // Gate wizard: unverified users go to verify page
     if (view === 'wizard' && user && !isVerified(user)) {
       view = 'verify'
@@ -67,6 +71,8 @@ function App() {
       path = '/contact'
     } else if (view === 'verify') {
       path = '/verify'
+    } else if (view === 'dashboard') {
+      path = '/dashboard'
     }
     window.history.pushState({}, '', path)
   }
@@ -113,13 +119,23 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
+  // Listen for ATSRating prompt to navigate to upload wizard
+  useEffect(() => {
+    const handleNavigateToUpload = () => {
+      handleNavigation('wizard')
+    }
+    window.addEventListener('navigate-to-upload', handleNavigateToUpload as EventListener)
+    return () => window.removeEventListener('navigate-to-upload', handleNavigateToUpload as EventListener)
+  }, [user])
+
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         setUser(session.user)
-        try { if (session.user.email_confirmed_at) { await syncVerifiedMetadata() } } catch {}
+        // Only sync once if email_confirmed_at present and metadata not yet verified
+        try { if (session.user.email_confirmed_at && session.user.user_metadata?.verified !== true) { await syncVerifiedMetadata() } } catch {}
       }
     }
 
@@ -128,8 +144,8 @@ function App() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      // Best-effort metadata sync when email becomes confirmed
-      try { if (session?.user?.email_confirmed_at) { syncVerifiedMetadata() } } catch {}
+      // Best-effort metadata sync when email becomes confirmed and not already set
+      try { if (session?.user?.email_confirmed_at && session.user.user_metadata?.verified !== true) { syncVerifiedMetadata() } } catch {}
     })
 
     return () => subscription.unsubscribe()
@@ -162,12 +178,17 @@ function App() {
       const refresh_token = params.get('refresh_token')
       if (access_token && refresh_token) {
         supabase.auth.setSession({ access_token, refresh_token })
-          .then(() => {
+          .then(async () => {
             const cleanUrl = window.location.pathname + window.location.search
             window.history.replaceState({}, '', cleanUrl)
             setCurrentView(getInitialView())
-            // Sync metadata in case email was just confirmed
-            try { syncVerifiedMetadata() } catch {}
+            // Sync metadata in case email was just confirmed and not yet set
+            try {
+              const { data: { user: fresh } } = await supabase.auth.getUser()
+              if (fresh?.email_confirmed_at && fresh.user_metadata?.verified !== true) {
+                await syncVerifiedMetadata()
+              }
+            } catch {}
           })
           .catch((e) => console.warn('Supabase setSession error:', e))
       }
@@ -192,6 +213,8 @@ function App() {
         return <SettingsPage />
       case 'verify':
         return <VerifyPage />
+      case 'dashboard':
+        return <DashboardPage />
       default:
         return <Hero onGetStarted={handleGetStarted} user={user} onLogout={handleLogout} />
     }
