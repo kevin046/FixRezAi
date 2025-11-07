@@ -17,6 +17,19 @@ export default function VerifyPage() {
   }, [])
 
   useEffect(() => {
+    try {
+      // If arriving with our JWT token in query, forward to backend verifier
+      const qs = new URLSearchParams(window.location.search)
+      const token = qs.get('token')
+      if (token) {
+        // Hit backend to validate and redirect appropriately
+        const base = window.location.origin
+        const verifyUrl = `${base}/api/verify?token=${encodeURIComponent(token)}`
+        window.location.replace(verifyUrl)
+        return
+      }
+    } catch {}
+
     // If arriving from Supabase email link, it appends a hash with type=signup and tokens
     // Clean the hash from the URL for a nicer UX. Also, defensively hydrate session.
     try {

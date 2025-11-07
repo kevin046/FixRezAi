@@ -24,6 +24,30 @@ function strengthToColors(strength: string) {
   }
 }
 
+function resolveApiBase(): string {
+  try {
+    const envBase = (import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined
+    const winBase = typeof window !== 'undefined' ? (window as any).__VITE_API_BASE_URL as string | undefined : undefined
+    const selectedBase = envBase || winBase
+    if (selectedBase && selectedBase.length > 0) {
+      return selectedBase.replace(/\/$/, '')
+    } else if (typeof window !== 'undefined') {
+      const host = window.location.hostname
+      const isLocal = host === 'localhost' || host === '127.0.0.1'
+      if (isLocal) {
+        // Match running server port if overridden; default 3001
+        const port = (window as any).__API_PORT || 3001
+        return `http://localhost:${port}/api`
+      } else if (host.includes('fixrez.com')) {
+        return 'https://fixrez.com/api'
+      } else {
+        return `${window.location.origin}/api`.replace(/\/$/, '')
+      }
+    }
+  } catch {}
+  return '/api'
+}
+
 export default function RegisterForm({ onToggle }: RegisterFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -76,7 +100,31 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
       if (!data.user) throw new Error('Registration failed. Please try again.')
 
       setUser(data.user)
-      setSuccess('Registration successful! Please check your email to verify your account.')
+
+      // Issue CSRF and send verification via backend
+      try {
+        const apiBase = resolveApiBase()
+        const csrf = await fetch(`${apiBase}/csrf`, { method: 'GET', credentials: 'include' })
+        const csrfData = await csrf.json()
+        const token = csrfData?.token
+        if (token) {
+          const resp = await fetch(`${apiBase}/send-verification`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+            credentials: 'include',
+            body: JSON.stringify({ email, userId: data.user.id }),
+          })
+          if (!resp.ok) {
+            const details = await resp.text()
+            console.warn('Send verification failed:', details)
+          }
+        }
+      } catch (e) {
+        console.warn('Verification email dispatch error:', (e as any)?.message || e)
+      }
+
+      // Immediate redirect to Confirm Email page
+      window.location.assign('/verify?sent=1')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'An error occurred'
       if (msg.toLowerCase().includes('user already registered')) {
