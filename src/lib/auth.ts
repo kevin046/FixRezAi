@@ -7,12 +7,28 @@ export function isVerified(user: User | null): boolean {
 }
 
 const RESEND_KEY = 'fixrez_resend_verification_at'
-const RESEND_COOLDOWN_MS = 60_000
+const RESEND_COOLDOWN_MS = 300_000 // 5 minutes cooldown to avoid 429s
+let resendInFlight = false
 
 // Guard variables for verified metadata sync
 const SYNC_KEY = 'fixrez_verified_sync_at'
 const SYNC_COOLDOWN_MS = 60_000 // 1 minute backoff to avoid 429s
 let syncInFlight = false
+
+export function getResendCooldownRemaining(): number {
+  try {
+    const last = Number(localStorage.getItem(RESEND_KEY) || '0')
+    const now = Date.now()
+    const remaining = RESEND_COOLDOWN_MS - (now - last)
+    return remaining > 0 ? remaining : 0
+  } catch {
+    return 0
+  }
+}
+
+export function canResend(): boolean {
+  return getResendCooldownRemaining() <= 0 && !resendInFlight
+}
 
 export async function resendVerification(email: string): Promise<{ success: boolean; message: string }> {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -20,12 +36,16 @@ export async function resendVerification(email: string): Promise<{ success: bool
   }
 
   try {
-    const last = Number(localStorage.getItem(RESEND_KEY) || '0')
-    const now = Date.now()
-    if (now - last < RESEND_COOLDOWN_MS) {
-      const seconds = Math.ceil((RESEND_COOLDOWN_MS - (now - last)) / 1000)
+    const remaining = getResendCooldownRemaining()
+    if (remaining > 0) {
+      const seconds = Math.ceil(remaining / 1000)
       return { success: false, message: `Please wait ${seconds}s before requesting again.` }
     }
+    if (resendInFlight) {
+      return { success: false, message: 'A resend request is already in progress. Please wait…' }
+    }
+
+    resendInFlight = true
 
     const { error } = await supabase.auth.resend({
       type: 'signup',
@@ -33,13 +53,21 @@ export async function resendVerification(email: string): Promise<{ success: bool
       options: { emailRedirectTo: `${window.location.origin}/verify` }
     })
     if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('too many') || msg.includes('rate')) {
+        // Stamp cooldown now to prevent immediate retries
+        try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
+        return { success: false, message: 'Too many requests. Please wait a few minutes and try again.' }
+      }
       return { success: false, message: error.message }
     }
 
-    localStorage.setItem(RESEND_KEY, String(now))
+    try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
     return { success: true, message: 'Verification email sent. Check your inbox.' }
   } catch (e) {
     return { success: false, message: e instanceof Error ? e.message : 'Failed to resend verification email.' }
+  } finally {
+    resendInFlight = false
   }
 }
 
@@ -81,11 +109,10 @@ export async function syncVerifiedMetadata(): Promise<void> {
       } catch (e) {
         console.warn('profiles upsert error:', e instanceof Error ? e.message : e)
       }
-      // Record last sync time to avoid immediate repeats
       localStorage.setItem(SYNC_KEY, String(now))
     }
   } catch (e) {
-    console.warn('syncVerifiedMetadata error:', e)
+    console.warn('syncVerifiedMetadata error:', e instanceof Error ? e.message : e)
   } finally {
     syncInFlight = false
   }

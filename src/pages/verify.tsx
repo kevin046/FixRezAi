@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
-import { isVerified, resendVerification, secureLogout, syncVerifiedMetadata } from '@/lib/auth'
+import { isVerified, resendVerification, secureLogout, syncVerifiedMetadata, canResend, getResendCooldownRemaining } from '@/lib/auth'
 import { ArrowLeft } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -8,7 +8,13 @@ export default function VerifyPage() {
   const { user } = useAuthStore()
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [loading, setLoading] = useState(false)
+  const [cooldownMs, setCooldownMs] = useState<number>(getResendCooldownRemaining())
   const email = user?.email || ''
+
+  useEffect(() => {
+    const id = setInterval(() => setCooldownMs(getResendCooldownRemaining()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     // If arriving from Supabase email link, it appends a hash with type=signup and tokens
@@ -78,9 +84,15 @@ export default function VerifyPage() {
       setStatus({ type: 'error', message: 'Please sign in and provide your email to resend verification.' })
       return
     }
+    if (!canResend()) {
+      const seconds = Math.ceil(getResendCooldownRemaining() / 1000)
+      setStatus({ type: 'error', message: `Please wait ${seconds}s before requesting again.` })
+      return
+    }
     setLoading(true)
     const res = await resendVerification(email)
     setLoading(false)
+    setCooldownMs(getResendCooldownRemaining())
     setStatus(res.success ? { type: 'success', message: res.message } : { type: 'error', message: res.message })
   }
 
@@ -96,6 +108,10 @@ export default function VerifyPage() {
       window.location.replace('/?logout_error=1')
     }
   }
+
+  const cooldownSeconds = Math.ceil(cooldownMs / 1000)
+  const resendDisabled = loading || cooldownMs > 0
+  const resendLabel = loading ? 'Sending...' : (cooldownMs > 0 ? `Resend in ${cooldownSeconds}s` : 'Resend verification email')
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
@@ -155,10 +171,10 @@ export default function VerifyPage() {
           <div className="space-y-3">
             <button
               onClick={handleResend}
-              disabled={loading}
+              disabled={resendDisabled}
               className="w-full py-2 rounded-xl text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? 'Sending...' : 'Resend verification email'}
+              {resendLabel}
             </button>
             <button
               onClick={handleGoToLogin}

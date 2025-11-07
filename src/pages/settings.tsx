@@ -1,12 +1,18 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import LogoutButton from '@/components/LogoutButton'
-import { isVerified, resendVerification } from '@/lib/auth'
+import { isVerified, resendVerification, canResend, getResendCooldownRemaining } from '@/lib/auth'
 
 const SettingsPage: React.FC = () => {
   const { user } = useAuthStore()
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [cooldownMs, setCooldownMs] = useState<number>(getResendCooldownRemaining())
+
+  useEffect(() => {
+    const id = setInterval(() => setCooldownMs(getResendCooldownRemaining()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -20,9 +26,23 @@ const SettingsPage: React.FC = () => {
   const email = user?.email || ''
 
   const handleResend = async () => {
+    if (!email) {
+      setStatus({ type: 'error', message: 'Please sign in to resend verification.' })
+      return
+    }
+    if (!canResend()) {
+      const seconds = Math.ceil(getResendCooldownRemaining() / 1000)
+      setStatus({ type: 'error', message: `Please wait ${seconds}s before requesting again.` })
+      return
+    }
     const result = await resendVerification(email)
+    setCooldownMs(getResendCooldownRemaining())
     setStatus({ type: result.success ? 'success' : 'error', message: result.message })
   }
+
+  const cooldownSeconds = Math.ceil(cooldownMs / 1000)
+  const resendDisabled = cooldownMs > 0
+  const resendLabel = cooldownMs > 0 ? `Resend in ${cooldownSeconds}s` : 'Resend verification email'
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
@@ -94,9 +114,10 @@ const SettingsPage: React.FC = () => {
           {!verified && (
             <button
               onClick={handleResend}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+              disabled={resendDisabled}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
             >
-              Resend verification email
+              {resendLabel}
             </button>
           )}
         </section>
