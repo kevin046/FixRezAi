@@ -14,6 +14,8 @@ import { secureLogout, isVerified, syncVerifiedMetadata } from './lib/auth'
 import { VerificationStatus } from './stores/authStore'
 import AdminMetricsPage from './pages/AdminMetrics'
 import { Toaster } from 'sonner'
+import Footer from '@/components/Footer'
+import SocialShareButtons from '@/components/SocialShareButtons'
 
 function App() {
   const { user, setUser, setVerificationStatus, logout } = useAuthStore()
@@ -287,6 +289,16 @@ function App() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
       {renderView()}
+      
+      {/* Social Share Buttons - Show on home page */}
+      {currentView === 'home' && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <SocialShareButtons />
+        </div>
+      )}
+      
+      {/* Footer */}
+      <Footer />
       <Toaster position="top-right" />
     </div>
   )

@@ -164,17 +164,17 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
 
           {/* Main Heading */}
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6 leading-tight text-center">
-            FixRez AI: Optimize Your Resume with{' '}
+            FixRez AI: Professional Resume Optimization Tool with{' '}
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              AI Magic
+              Advanced AI Technology
             </span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed text-center">
-            FixRez AI uses advanced AI to tailor your resume for any job description. 
-            Get past ATS systems and land more interviews with personalized optimization.
-          </p>
+          <h2 className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed text-center">
+            FixRez AI uses advanced artificial intelligence to tailor your resume for any job description. 
+            Get past ATS systems and land more interviews with personalized optimization and AI-powered insights.
+          </h2>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-16 w-full">

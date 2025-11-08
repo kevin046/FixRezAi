@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Main Pages -->
   <url>
     <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/</loc>
     <lastmod>2025-11-05</lastmod>
@@ -7,11 +8,45 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/optimize</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/auth</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/dashboard</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Support Pages -->
+  <url>
     <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/contact</loc>
     <lastmod>2025-11-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
+  <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/verify</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/settings</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <!-- Legal Pages -->
   <url>
     <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/terms</loc>
     <lastmod>2025-11-05</lastmod>
@@ -23,5 +58,31 @@
     <lastmod>2025-11-05</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
+  </url>
+  
+  <!-- Resource Pages (Future) -->
+  <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/help</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/blog/how-to-beat-ats-systems</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/blog/resume-writing-tips</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/blog/ai-resume-optimization</loc>
+    <lastmod>2025-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>
