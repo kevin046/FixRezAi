@@ -9,6 +9,7 @@ import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import VerificationService from './services/verificationService.js';
+import VerificationServiceEnhanced from './services/verificationServiceEnhanced.js';
 import verificationMiddleware from './middleware/verification.js';
 
 // Import serverless-style handlers and adapt to Express
@@ -49,6 +50,7 @@ app.use(express.json({ limit: '1mb' }));
 
 // Initialize verification service
 const verificationService = new VerificationService();
+const verificationServiceEnhanced = new VerificationServiceEnhanced();
 
 // Simple health check
 app.get('/health', (req, res) => {
@@ -515,6 +517,166 @@ app.get('/api/verification-stats', ipAllowlist, rateLimiter, requireAuth, async 
   }
 })
 
+// Enhanced verification endpoints using database functions
+app.post('/api/verification/create-token', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  const { email, type = 'email' } = req.body
+  const user = req.user
+
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Email is required' })
+  }
+
+  try {
+    // Use the enhanced service to create verification token via database function
+    const tokenResult = await verificationServiceEnhanced.createVerificationToken({
+      userId: user.id,
+      email,
+      type,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    })
+
+    if (!tokenResult.success) {
+      return res.status(400).json({ success: false, error: tokenResult.error })
+    }
+
+    res.json({
+      success: true,
+      message: 'Verification token created successfully',
+      token: tokenResult.token,
+      expires_at: tokenResult.expires_at,
+      token_id: tokenResult.token_id
+    })
+  } catch (error) {
+    console.error('Error creating verification token:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Enhanced verify endpoint using database function
+app.post('/api/verification/verify-token', ipAllowlist, rateLimiter, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  const { token, type = 'email' } = req.body
+
+  if (!token) {
+    return res.status(400).json({ success: false, error: 'Token is required' })
+  }
+
+  try {
+    // Use the enhanced service to verify token via database function
+    const verifyResult = await verificationServiceEnhanced.verifyUserToken({
+      token,
+      type,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    })
+
+    if (!verifyResult.success) {
+      return res.status(400).json({ success: false, error: verifyResult.error })
+    }
+
+    res.json({
+      success: true,
+      message: 'Verification successful',
+      user_id: verifyResult.user_id,
+      email: verifyResult.email,
+      verified_at: verifyResult.verified_at
+    })
+  } catch (error) {
+    console.error('Error verifying token:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Get enhanced verification status
+app.get('/api/verification/status/:userId?', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  try {
+    const user = req.user
+    const targetUserId = req.params.userId || user.id
+
+    // Only allow users to check their own status unless they're admin
+    if (targetUserId !== user.id && !user.is_admin) {
+      return res.status(403).json({ success: false, error: 'Access denied' })
+    }
+
+    // Use the enhanced service to get verification status via database function
+    const statusResult = await verificationServiceEnhanced.getUserVerificationStatus(targetUserId)
+
+    if (!statusResult.success) {
+      return res.status(400).json({ success: false, error: statusResult.error })
+    }
+
+    res.json({
+      success: true,
+      status: statusResult.status
+    })
+  } catch (error) {
+    console.error('Error getting verification status:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Get verification errors for a user
+app.get('/api/verification/errors/:userId?', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  try {
+    const user = req.user
+    const targetUserId = req.params.userId || user.id
+
+    // Only allow users to check their own errors unless they're admin
+    if (targetUserId !== user.id && !user.is_admin) {
+      return res.status(403).json({ success: false, error: 'Access denied' })
+    }
+
+    const { data, error } = await supabase
+      .from('verification_error_messages')
+      .select('*')
+      .eq('user_id', targetUserId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (error) {
+      console.error('Error fetching verification errors:', error)
+      return res.status(500).json({ success: false, error: 'Database error' })
+    }
+
+    res.json({
+      success: true,
+      errors: data
+    })
+  } catch (error) {
+    console.error('Error fetching verification errors:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Cleanup expired tokens
+app.post('/api/verification/cleanup', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
+  try {
+    const user = req.user
+
+    // Only allow admin users to cleanup tokens
+    if (!user.is_admin) {
+      return res.status(403).json({ success: false, error: 'Admin access required' })
+    }
+
+    const { data, error } = await supabase
+      .rpc('cleanup_expired_tokens')
+
+    if (error) {
+      console.error('Error cleaning up tokens:', error)
+      return res.status(500).json({ success: false, error: 'Database error' })
+    }
+
+    res.json({
+      success: true,
+      message: 'Expired tokens cleaned up successfully',
+      cleaned_count: data
+    })
+  } catch (error) {
+    console.error('Error cleaning up tokens:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
 // API routes
 app.post('/api/optimize', ipAllowlist, rateLimiter, requireVerified, wrap(optimizeHandler));
 app.post('/api/contact', ipAllowlist, rateLimiter, wrap(contactHandler));
@@ -529,6 +691,11 @@ app.listen(PORT, () => {
   console.log('   GET  /api/csrf');
   console.log('   POST /api/send-verification');
   console.log('   GET  /api/verify');
+  console.log('   POST /api/verification/create-token');
+  console.log('   POST /api/verification/verify-token');
+  console.log('   GET  /api/verification/status/:userId?');
+  console.log('   GET  /api/verification/errors/:userId?');
+  console.log('   POST /api/verification/cleanup');
 });
 
 

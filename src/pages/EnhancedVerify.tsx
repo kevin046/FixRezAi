@@ -7,8 +7,10 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, AlertCircle, Mail, Clock, RefreshCw, Shield } from 'lucide-react';
 import VerificationIndicator from '@/components/VerificationIndicator';
+import VerificationErrorHandler from '@/components/VerificationErrorHandler';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface VerificationResult {
   success: boolean;
@@ -21,7 +23,7 @@ interface VerificationResult {
 const EnhancedVerify: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, verifyEmail, createVerificationToken, fetchVerificationStatus, error, clearError } = useAuthStore();
   
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,65 +35,65 @@ const EnhancedVerify: React.FC = () => {
   const tokenId = searchParams.get('token_id');
 
   useEffect(() => {
-    if (token && userId) {
+    if (token) {
       verifyEmailToken();
-    } else if (isAuthenticated) {
+    } else if (isAuthenticated && user?.id) {
       // Show current verification status for authenticated user
+      fetchVerificationStatus(user.id);
       setLoading(false);
     } else {
       setLoading(false);
     }
-  }, [token, userId, isAuthenticated]);
+  }, [token, isAuthenticated, user?.id]);
 
   const verifyEmailToken = async () => {
     try {
       setLoading(true);
+      clearError();
       
-      const response = await fetch('/api/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token,
-          user_id: userId,
-          token_id: tokenId,
-          user_agent: navigator.userAgent,
-          ip_address: await getClientIP()
-        }),
+      // Use the new verification system
+      await verifyEmail(token!);
+      
+      setVerificationResult({
+        success: true,
+        message: 'Email verification successful! Your account is now verified.',
+        timestamp: new Date().toISOString()
       });
-
-      const result = await response.json();
       
-      if (response.ok && result.success) {
-        setVerificationResult({
-          success: true,
-          message: 'Email verification successful! Your account is now verified.',
-          timestamp: result.timestamp,
-          tokenId: result.token_id,
-          auditLogId: result.audit_log_id
-        });
-        
-        // Refresh user data after successful verification
-        await refreshUserData();
-        
-        // Redirect to dashboard after 3 seconds
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 3000);
-      } else {
-        setVerificationResult({
-          success: false,
-          message: result.message || 'Email verification failed. The token may be expired or invalid.',
-          tokenId: result.token_id
-        });
+      // Refresh verification status after successful verification
+      if (user?.id) {
+        await fetchVerificationStatus(user.id);
       }
-    } catch (error) {
+      
+      // Show success toast
+      toast.success('Email verified successfully!');
+      
+      // Redirect to dashboard after 3 seconds
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 3000);
+    } catch (error: any) {
       console.error('Verification error:', error);
+      
+      let errorMessage = 'Email verification failed.';
+      
+      if (error.message?.includes('expired')) {
+        errorMessage = 'The verification token has expired. Please request a new verification email.';
+      } else if (error.message?.includes('invalid')) {
+        errorMessage = 'The verification token is invalid. Please request a new verification email.';
+      } else if (error.message?.includes('already verified')) {
+        errorMessage = 'Your email is already verified.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       setVerificationResult({
         success: false,
-        message: 'An error occurred during verification. Please try again or contact support.'
+        message: errorMessage
       });
+      
+      // Show error toast
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -123,30 +125,26 @@ const EnhancedVerify: React.FC = () => {
     
     try {
       setSendingEmail(true);
+      clearError();
       
-      const response = await fetch('/api/send-verification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          email: user.email,
-          user_agent: navigator.userAgent,
-          ip_address: await getClientIP()
-        }),
-      });
-
-      const result = await response.json();
+      // Use the new verification system to create a token
+      await createVerificationToken(user.email, 'email');
       
-      if (response.ok) {
-        alert('Verification email sent! Please check your inbox.');
-      } else {
-        alert('Failed to send verification email. Please try again or contact support.');
-      }
-    } catch (error) {
+      toast.success('Verification email sent! Please check your inbox.');
+    } catch (error: any) {
       console.error('Failed to send verification email:', error);
-      alert('An error occurred while sending the verification email.');
+      
+      let errorMessage = 'Failed to send verification email.';
+      
+      if (error.message?.includes('rate limit')) {
+        errorMessage = 'Too many requests. Please wait a few minutes before trying again.';
+      } else if (error.message?.includes('already verified')) {
+        errorMessage = 'Your email is already verified.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setSendingEmail(false);
     }
@@ -183,6 +181,14 @@ const EnhancedVerify: React.FC = () => {
             Secure your account with email verification
           </p>
         </div>
+
+        {/* Error Handler */}
+        <VerificationErrorHandler 
+          className="mb-6"
+          onRetry={() => token && verifyEmailToken()}
+          onRequestNewToken={resendVerificationEmail}
+          showDetails={showDetails}
+        />
 
         {/* Current Status Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6">
