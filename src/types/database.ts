@@ -55,12 +55,15 @@ export type Database = {
           id: string
           user_id: string
           token_hash: string
-          token_type: string
+          // Add canonical fields used by tests
+          type: string
+          method: string
+          used: boolean
           expires_at: string
           used_at: string | null
           created_at: string
           created_by_ip: string | null
-          metadata: Json
+          metadata: Record<string, any>
           attempts: number
           max_attempts: number
         }
@@ -68,12 +71,14 @@ export type Database = {
           id?: string
           user_id: string
           token_hash: string
-          token_type?: string
+          type?: string
+          method?: string
+          used?: boolean
           expires_at: string
           used_at?: string | null
           created_at?: string
           created_by_ip?: string | null
-          metadata?: Json
+          metadata?: Record<string, any>
           attempts?: number
           max_attempts?: number
         }
@@ -81,12 +86,14 @@ export type Database = {
           id?: string
           user_id?: string
           token_hash?: string
-          token_type?: string
+          type?: string
+          method?: string
+          used?: boolean
           expires_at?: string
           used_at?: string | null
           created_at?: string
           created_by_ip?: string | null
-          metadata?: Json
+          metadata?: Record<string, any>
           attempts?: number
           max_attempts?: number
         }
@@ -105,36 +112,36 @@ export type Database = {
           id: string
           user_id: string
           action: string
-          action_timestamp: string
-          action_by_ip: string | null
-          action_by_user_agent: string | null
+          created_at: string
+          verification_method: string | null
+          ip_address: string | null
+          user_agent: string | null
           verification_token_id: string | null
-          details: Json
-          success: boolean
+          metadata: Record<string, any>
           error_message: string | null
         }
         Insert: {
           id?: string
           user_id: string
           action: string
-          action_timestamp?: string
-          action_by_ip?: string | null
-          action_by_user_agent?: string | null
+          created_at?: string
+          verification_method?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
           verification_token_id?: string | null
-          details?: Json
-          success?: boolean
+          metadata?: Record<string, any>
           error_message?: string | null
         }
         Update: {
           id?: string
           user_id?: string
           action?: string
-          action_timestamp?: string
-          action_by_ip?: string | null
-          action_by_user_agent?: string | null
+          created_at?: string
+          verification_method?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
           verification_token_id?: string | null
-          details?: Json
-          success?: boolean
+          metadata?: Record<string, any>
           error_message?: string | null
         }
         Relationships: [
@@ -195,16 +202,56 @@ export type Database = {
       verify_user_token: {
         Args: {
           p_user_id: string
-          p_token: string
-          p_method: string
+          p_plain_token: string
+          p_ip_address?: string | null
+          p_user_agent?: string | null
         }
-        Returns: Json
+        Returns: { success: boolean; message: string }
       }
       get_verification_status: {
         Args: {
           p_user_id: string
         }
         Returns: Json
+      }
+      get_verification_error_message: {
+        Args: {
+          p_error_type: Database["public"]["Enums"]["verification_error_type"]
+        }
+        Returns: { user_message: string; retry_allowed: boolean; retry_delay_minutes: number }
+      }
+      log_verification_error: {
+        Args: {
+          p_user_id: string
+          p_error_type: Database["public"]["Enums"]["verification_error_type"]
+          p_context?: Json
+          p_ip_address?: string | null
+          p_user_agent?: string | null
+        }
+        Returns: string
+      }
+      get_verification_audit_trail: {
+        Args: {
+          p_user_id: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: { audit_id: string; action: string; action_timestamp: string; verification_method: string | null; ip_address: string | null; error_message: string | null; metadata: Json }[]
+      }
+      get_verification_statistics: {
+        Args: {
+          p_start_date?: string
+          p_end_date?: string
+        }
+        Returns: { total_verified: number; total_failed: number; total_expired: number; success_rate: number; avg_attempts_per_verification: number }
+      }
+      verify_verification_integrity: {
+        Args: Record<string, never>
+        Returns: Json[]
+      }
+      fix_verification_integrity_issues: {
+        Args: Record<string, never>
+        Returns: number
       }
     }
     Enums: {

@@ -9,6 +9,9 @@ export interface VerificationStatus {
   verification_method: string | null
   verification_token_id: string | null
   verification_metadata: Record<string, any> | null
+  // Optional fields used by settings page and enhanced services
+  has_valid_token?: boolean
+  token_expires_at?: string | null
 }
 
 export interface VerificationError {
@@ -33,7 +36,7 @@ interface AuthState {
   setUser: (user: User | null) => void
   setVerificationStatus: (status: VerificationStatus | null) => void
   fetchVerificationStatus: (userId?: string) => Promise<void>
-  createVerificationToken: (email: string, type?: string) => Promise<string>
+  createVerificationToken: (email?: string, type?: string) => Promise<string>
   verifyEmail: (token: string, type?: string) => Promise<void>
   fetchVerificationErrors: (userId?: string) => Promise<void>
   logout: () => Promise<void>
@@ -91,7 +94,7 @@ export const useAuthStore = create<AuthState>()(
           } else {
             throw new Error(result.error || 'Failed to fetch verification status')
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to fetch verification status:', error)
           set({ error: error.message })
         } finally {
@@ -99,14 +102,17 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       
-      createVerificationToken: async (email: string, type: string = 'email') => {
+      // Relaxed signature: email optional, type defaults to 'email'. If email omitted, use current user's email.
+      createVerificationToken: async (email?: string, type: string = 'email') => {
         const { user } = get()
         
         if (!user?.id) {
           throw new Error('User not authenticated')
         }
         
-        if (!email) {
+        const finalEmail = email || user.email || (user.user_metadata as any)?.email
+        
+        if (!finalEmail) {
           throw new Error('Email is required')
         }
         
@@ -124,7 +130,7 @@ export const useAuthStore = create<AuthState>()(
               'Authorization': `Bearer ${session.access_token}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ email, type })
+            body: JSON.stringify({ email: finalEmail, type })
           })
           
           if (!response.ok) {
@@ -138,7 +144,7 @@ export const useAuthStore = create<AuthState>()(
           } else {
             throw new Error(result.error || 'Failed to create verification token')
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to create verification token:', error)
           set({ error: error.message })
           throw error
@@ -181,14 +187,14 @@ export const useAuthStore = create<AuthState>()(
           
           const result = await response.json()
           
-          if (result.success) {
-            // Refresh verification status after successful verification
-            await get().fetchVerificationStatus(user.id)
-          } else {
+          if (!result.success) {
             throw new Error(result.error || 'Verification failed')
           }
-        } catch (error) {
-          console.error('Email verification failed:', error)
+          
+          // Refresh status after verification
+          await get().fetchVerificationStatus(user.id)
+        } catch (error: any) {
+          console.error('Failed to verify token:', error)
           set({ error: error.message })
           throw error
         } finally {
@@ -227,11 +233,11 @@ export const useAuthStore = create<AuthState>()(
           const result = await response.json()
           
           if (result.success) {
-            set({ verificationErrors: result.errors })
+            set({ verificationErrors: result.errors || [] })
           } else {
             throw new Error(result.error || 'Failed to fetch verification errors')
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to fetch verification errors:', error)
           set({ error: error.message })
         } finally {
@@ -240,39 +246,21 @@ export const useAuthStore = create<AuthState>()(
       },
       
       logout: async () => {
-        try {
-          await supabase.auth.signOut()
-          localStorage.removeItem('fixrez-auth')
-          set({ 
-            user: null, 
-            isAuthenticated: false, 
-            verificationStatus: null,
-            verificationErrors: [],
-            error: null
-          })
-        } catch (error) {
-          console.error('Logout failed:', error)
-          set({ error: error.message })
-        }
+        await supabase.auth.signOut()
+        set({ user: null, isAuthenticated: false, verificationStatus: null })
       },
       
       clearError: () => set({ error: null })
     }),
     {
-      name: 'fixrez-auth',
+      name: 'auth-store',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ 
-        user: state.user, 
+      partialize: (state) => ({
+        user: state.user,
         isAuthenticated: state.isAuthenticated,
         verificationStatus: state.verificationStatus,
-        verificationErrors: state.verificationErrors
-      }),
-      onRehydrateStorage: () => {
-        return () => {
-          // Mark hydration complete after persisted state loads
-          useAuthStore.setState({ hydrated: true })
-        }
-      },
+        hydrated: state.hydrated
+      })
     }
   )
 )

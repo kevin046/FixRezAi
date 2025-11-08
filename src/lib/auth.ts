@@ -6,7 +6,7 @@ export function isVerified(user: User | null): boolean {
   // First check enhanced verification status from auth store
   const verificationStatus = useAuthStore.getState().verificationStatus
   if (verificationStatus) {
-    return verificationStatus.is_verified
+    return verificationStatus.verified
   }
   
   // Fallback to legacy verification methods
@@ -118,8 +118,6 @@ export async function syncVerifiedMetadata(): Promise<void> {
       }
       localStorage.setItem(SYNC_KEY, String(now))
     }
-  } catch (e) {
-    console.warn('syncVerifiedMetadata error:', e instanceof Error ? e.message : e)
   } finally {
     syncInFlight = false
   }
