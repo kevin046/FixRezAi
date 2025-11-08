@@ -4,7 +4,15 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   images: {
-    domains: ['localhost'],
+    // Use remotePatterns instead of deprecated images.domains
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
   async rewrites() {
     return [
@@ -16,6 +24,10 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     optimizePackageImports: ['lucide-react'],
+  },
+  // Silence workspace root inference warnings by explicitly setting the Turbopack root
+  turbopack: {
+    root: __dirname,
   },
 };
 
