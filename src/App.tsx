@@ -12,7 +12,7 @@ import { useAuthStore } from './stores/authStore'
 import { supabase } from './lib/supabase'
 import { secureLogout, isVerified, syncVerifiedMetadata } from './lib/auth'
 import { VerificationStatus } from './stores/authStore'
-import AdminMetricsPage from './pages/adminMetrics'
+import AdminMetricsPage from './pages/AdminMetrics'
 
 function App() {
   const { user, setUser, setVerificationStatus, logout } = useAuthStore()
