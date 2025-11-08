@@ -11,69 +11,47 @@ import DashboardPage from './pages/dashboard'
 import { useAuthStore } from './stores/authStore'
 import { supabase } from './lib/supabase'
 import { secureLogout, isVerified, syncVerifiedMetadata } from './lib/auth'
+import { VerificationStatus } from './stores/authStore'
+import AdminMetricsPage from './pages/adminMetrics'
 
 function App() {
-  const { user, setUser, logout } = useAuthStore()
+  const { user, setUser, setVerificationStatus, logout } = useAuthStore()
   
   // Check URL path to determine initial view
-  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' => {
+  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' => {
     const path = window.location.pathname
-    if (path === '/optimize') {
-      return 'wizard'
-    }
-    if (path === '/terms') {
-      return 'terms'
-    }
-    if (path === '/privacy') {
-      return 'privacy'
-    }
-    if (path === '/settings') {
-      return 'settings'
-    }
-    if (path.startsWith('/auth')) {
-      return 'auth'
-    }
-    if (path === '/contact') {
-      return 'contact'
-    }
-    if (path === '/verify') {
-      return 'verify'
-    }
-    if (path === '/dashboard') {
-      return 'dashboard'
-    }
+    if (path === '/optimize') return 'wizard'
+    if (path === '/terms') return 'terms'
+    if (path === '/privacy') return 'privacy'
+    if (path === '/settings') return 'settings'
+    if (path.startsWith('/auth')) return 'auth'
+    if (path === '/contact') return 'contact'
+    if (path === '/verify') return 'verify'
+    if (path === '/dashboard') return 'dashboard'
+    if (path === '/admin/metrics') return 'adminMetrics'
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard'>(
+  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics'>(
     getInitialView()
   )
 
-  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard') => {
-    // Gate wizard: unverified users go to verify page
+  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics') => {
     if (view === 'wizard' && user && !isVerified(user)) {
       view = 'verify'
     }
 
     setCurrentView(view)
     let path = '/'
-    if (view === 'wizard') {
-      path = '/optimize'
-    } else if (view === 'terms') {
-      path = '/terms'
-    } else if (view === 'privacy') {
-      path = '/privacy'
-    } else if (view === 'settings') {
-      path = '/settings'
-    } else if (view === 'auth') {
-      path = '/auth'
-    } else if (view === 'contact') {
-      path = '/contact'
-    } else if (view === 'verify') {
-      path = '/verify'
-    } else if (view === 'dashboard') {
-      path = '/dashboard'
-    }
+    if (view === 'wizard') path = '/optimize'
+    else if (view === 'terms') path = '/terms'
+    else if (view === 'privacy') path = '/privacy'
+    else if (view === 'settings') path = '/settings'
+    else if (view === 'auth') path = '/auth'
+    else if (view === 'contact') path = '/contact'
+    else if (view === 'verify') path = '/verify'
+    else if (view === 'dashboard') path = '/dashboard'
+    else if (view === 'adminMetrics') path = '/admin/metrics'
     window.history.pushState({}, '', path)
   }
 
@@ -128,12 +106,34 @@ function App() {
     return () => window.removeEventListener('navigate-to-upload', handleNavigateToUpload as EventListener)
   }, [user])
 
+  // Fetch verification status for authenticated user
+  const fetchVerificationStatus = async (userId: string) => {
+    try {
+      const response = await fetch('/api/verification-status', {
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.verification_status) {
+          setVerificationStatus(data.verification_status)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching verification status:', error)
+    }
+  }
+
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         setUser(session.user)
+        // Fetch enhanced verification status
+        await fetchVerificationStatus(session.user.id)
         // Only sync once if email_confirmed_at present and metadata not yet verified
         try { if (session.user.email_confirmed_at && session.user.user_metadata?.verified !== true) { await syncVerifiedMetadata() } } catch {}
       }
@@ -144,12 +144,17 @@ function App() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) {
+        fetchVerificationStatus(session.user.id)
+      } else {
+        setVerificationStatus(null)
+      }
       // Best-effort metadata sync when email becomes confirmed and not already set
       try { if (session?.user?.email_confirmed_at && session.user.user_metadata?.verified !== true) { syncVerifiedMetadata() } } catch {}
     })
 
     return () => subscription.unsubscribe()
-  }, [setUser])
+  }, [setUser, setVerificationStatus])
 
   // If user is authenticated and currently on Auth page, send them home or to Verify
   useEffect(() => {
@@ -215,6 +220,8 @@ function App() {
         return <VerifyPage />
       case 'dashboard':
         return <DashboardPage />
+      case 'adminMetrics':
+        return <AdminMetricsPage />
       default:
         return <Hero onGetStarted={handleGetStarted} user={user} onLogout={handleLogout} />
     }

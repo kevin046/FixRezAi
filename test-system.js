@@ -8,7 +8,7 @@ console.log('🧪 Testing Resume Optimization System...');
 console.log('📄 Sample resume length:', resumeText.length, 'characters');
 
 // Make the API call
-fetch('http://localhost:3001/api/optimize', {
+fetch('http://localhost:3003/api/optimize', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

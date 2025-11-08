@@ -39,6 +39,7 @@ const logos = [
 import { User } from '@supabase/supabase-js'
 import { useAuthStore } from '@/stores/authStore'
 import { isVerified } from '@/lib/auth'
+import VerificationIndicator from '@/components/VerificationIndicator'
 import { useResumeStore } from '@/stores/resumeStore'
 
 interface HeroProps {
@@ -121,9 +122,7 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
                     Welcome, {user.email?.split('@')[0]}
                   </span>
                   {/* Verification badge */}
-                  <span className={`px-2 py-1 text-xs rounded-full border ${verified ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>
-                    {verified ? 'Verified' : 'Not Verified'}
-                  </span>
+                  <VerificationIndicator size="sm" />
                   <a
                     href="/dashboard"
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"

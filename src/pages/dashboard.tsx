@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { PieChart, BarChart2, Search, ArrowLeft, Target } from 'lucide-react'
+import { PieChart, BarChart2, Search, ArrowLeft, Target, CheckCircle, XCircle } from 'lucide-react'
 import { getOptimizationHistory, type OptimizationEvent } from '@/lib/analytics'
 import { getExportStats } from '@/lib/analytics'
 import LogoutButton from '@/components/LogoutButton'
@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { isVerified } from '@/lib/auth'
 import { useResumeStore } from '@/stores/resumeStore'
 import { calculateATSScore, ATSScore } from '@/lib/atsScoring'
+import VerificationIndicator from '@/components/VerificationIndicator'
 
 export default function DashboardPage() {
   const [query, setQuery] = useState('')
@@ -83,9 +84,7 @@ export default function DashboardPage() {
                   <span className="text-gray-700 dark:text-gray-300">
                     Welcome, {user.email?.split('@')[0]}
                   </span>
-                  <span className={`px-2 py-1 text-xs rounded-full border ${verified ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>
-                    {verified ? 'Verified' : 'Not Verified'}
-                  </span>
+                  <VerificationIndicator size="sm" />
                   <a
                     href="/settings"
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"

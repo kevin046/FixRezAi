@@ -3,6 +3,13 @@ import type { User } from '@supabase/supabase-js'
 import { useAuthStore } from '@/stores/authStore'
 
 export function isVerified(user: User | null): boolean {
+  // First check enhanced verification status from auth store
+  const verificationStatus = useAuthStore.getState().verificationStatus
+  if (verificationStatus) {
+    return verificationStatus.is_verified
+  }
+  
+  // Fallback to legacy verification methods
   return !!(user?.email_confirmed_at || (user as any)?.user_metadata?.verified)
 }
 

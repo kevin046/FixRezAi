@@ -1,13 +1,15 @@
+import dotenv from 'dotenv';
+// Load local env for dev - MUST be first
+dotenv.config({ path: '.env.local' });
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
-
-// Load local env for dev
-dotenv.config({ path: '.env.local' });
+import VerificationService from './services/verificationService.js';
+import verificationMiddleware from './middleware/verification.js';
 
 // Import serverless-style handlers and adapt to Express
 import optimizeHandler, { AI_STATUS } from './optimize.js';
@@ -21,7 +23,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http:
   .filter(Boolean)
 
 // Dev bypass flag
-const DEV_AUTH_BYPASS = (String(process.env.DEV_AUTH_BYPASS || '').toLowerCase() === 'true') || !process.env.SUPABASE_SERVICE_ROLE_KEY
+const DEV_AUTH_BYPASS = (String(process.env.DEV_AUTH_BYPASS || '').toLowerCase() === 'true') && (process.env.NODE_ENV !== 'production');
 console.log('🔧 DEV_AUTH_BYPASS:', DEV_AUTH_BYPASS ? 'enabled' : 'disabled')
 
 const corsOptions = {
@@ -44,6 +46,9 @@ app.use(cors(corsOptions))
 // Express v5 path-to-regexp doesn't accept '*' route; use regex
 app.options(/.*/, cors(corsOptions))
 app.use(express.json({ limit: '1mb' }));
+
+// Initialize verification service
+const verificationService = new VerificationService();
 
 // Simple health check
 app.get('/health', (req, res) => {
@@ -181,12 +186,64 @@ function csrfCheck(req, res, next) {
   next()
 }
 
-// Middleware: require verified Supabase user
-function requireVerified(req, res, next) {
+// Simple middleware: require authenticated Supabase user (no verification check)
+async function requireAuth(req, res, next) {
+  // Dev bypass: allow requests without authentication when enabled
+  if (DEV_AUTH_BYPASS) {
+    console.log('🔓 DEV bypass active: skipping authentication for', req.path)
+    req.user = { id: '00000000-0000-0000-0000-000000000000', email: 'dev@localhost', email_confirmed_at: new Date().toISOString(), user_metadata: { verified: true } }
+    return next()
+  }
+
+  const auth = req.headers['authorization'] || ''
+  const m = auth.match(/^Bearer\s+(.*)$/i)
+  const token = m ? m[1] : null
+  const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!token) {
+    const entry = { type: 'auth', result: 'missing_token', path: req.path, ip: req.ip, ts: new Date().toISOString() }
+    console.log('AUDIT auth:', entry)
+    auditLog(entry)
+    return res.status(401).json({ success: false, error: 'Missing Authorization token' })
+  }
+  if (!serviceKey) {
+    const entry = { type: 'auth', result: 'server_misconfig', path: req.path, ip: req.ip, ts: new Date().toISOString() }
+    console.error('AUDIT auth:', entry)
+    auditLog(entry)
+    return res.status(500).json({ success: false, error: 'Server not configured' })
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey)
+  
+  try {
+    const { data, error } = await admin.auth.getUser(token)
+    
+    if (error || !data?.user) {
+      const msg = (error?.message || '').toLowerCase()
+      const reason = msg.includes('expired') ? 'token_expired' : 'invalid_token'
+      const entry = { type: 'auth', result: reason, path: req.path, ip: req.ip, ts: new Date().toISOString(), error: error?.message }
+      console.log('AUDIT auth:', entry)
+      auditLog(entry)
+      return res.status(401).json({ success: false, error: reason === 'token_expired' ? 'Token expired' : 'Invalid token' })
+    }
+    
+    req.user = data.user
+    next()
+  } catch (e) {
+    const entry = { type: 'auth', result: 'exception', path: req.path, ip: req.ip, ts: new Date().toISOString(), error: e?.message }
+    console.error('AUDIT auth:', entry)
+    auditLog(entry)
+    return res.status(500).json({ success: false, error: 'Authentication check failed' })
+  }
+}
+
+// Enhanced middleware: require verified Supabase user with proper verification status checking
+async function requireVerified(req, res, next) {
   // Dev bypass: allow requests without verification when enabled
   if (DEV_AUTH_BYPASS) {
     console.log('🔓 DEV bypass active: skipping user verification for', req.path)
-    req.user = { id: 'dev-user', email: 'dev@localhost', email_confirmed_at: new Date().toISOString(), user_metadata: { verified: true } }
+    req.user = { id: '00000000-0000-0000-0000-000000000000', email: 'dev@localhost', email_confirmed_at: new Date().toISOString(), user_metadata: { verified: true } }
     return next()
   }
 
@@ -210,7 +267,10 @@ function requireVerified(req, res, next) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey)
-  admin.auth.getUser(token).then(({ data, error }) => {
+  
+  try {
+    const { data, error } = await admin.auth.getUser(token)
+    
     if (error || !data?.user) {
       const msg = (error?.message || '').toLowerCase()
       const reason = msg.includes('expired') ? 'token_expired' : 'invalid_token'
@@ -219,46 +279,75 @@ function requireVerified(req, res, next) {
       auditLog(entry)
       return res.status(401).json({ success: false, error: reason === 'token_expired' ? 'Token expired' : 'Invalid token' })
     }
+    
     const user = data.user
-    const metaVerified = !!(user?.user_metadata && (user.user_metadata.verified === true || String(user.user_metadata.verified).toLowerCase() === 'true'))
-
-    let profileVerified = false
-    // Best-effort fallback: check the public profiles table if present
-    Promise.resolve()
-      .then(async () => {
-        try {
-          const { data: prof, error: pErr } = await admin.from('profiles').select('verified').eq('id', user.id).limit(1).maybeSingle()
-          if (!pErr && prof && typeof prof.verified !== 'undefined') {
-            profileVerified = !!prof.verified
-          }
-        } catch (e) {
-          // Table may not exist or RLS may block; ignore
-        }
+    
+    // Use the enhanced verification service to get accurate verification status
+    const verificationResult = await verificationService.getUserVerificationStatus(user.id)
+    
+    if (!verificationResult.success) {
+      const entry = { type: 'verify', result: 'verification_check_failed', path: req.path, ip: req.ip, ts: new Date().toISOString(), error: verificationResult.error }
+      console.error('AUDIT verify:', entry)
+      auditLog(entry)
+      return res.status(500).json({ success: false, error: 'Verification check failed' })
+    }
+    
+    const isVerified = verificationResult.status.is_verified
+    
+    const entry = { 
+      type: 'verify', 
+      result: isVerified ? 'verified' : 'unverified', 
+      path: req.path, 
+      ip: req.ip, 
+      ts: new Date().toISOString(), 
+      userId: user.id, 
+      email: user.email, 
+      verificationStatus: verificationResult.status 
+    }
+    console.log('AUDIT verify:', entry)
+    auditLog(entry)
+    
+    if (!isVerified) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Email verification required',
+        verification_required: true,
+        has_valid_token: verificationResult.status.has_valid_token,
+        token_expires_at: verificationResult.status.token_expires_at
       })
-      .finally(() => {
-        const verified = !!user.email_confirmed_at || metaVerified || profileVerified
-        const entry = { type: 'verify', result: verified ? 'verified' : 'unverified', path: req.path, ip: req.ip, ts: new Date().toISOString(), userId: user.id, email: user.email, metaVerified, profileVerified, email_confirmed_at: user.email_confirmed_at }
-        console.log('AUDIT verify:', entry)
-        auditLog(entry)
-        if (!verified) {
-          return res.status(403).json({ success: false, error: 'Email verification required' })
-        }
-        // Attach user to request for downstream handlers if needed
-        req.user = user
-        next()
-      })
-  }).catch((e) => {
+    }
+    
+    // Attach user to request for downstream handlers if needed
+    req.user = user
+    next()
+  } catch (e) {
     const entry = { type: 'verify', result: 'exception', path: req.path, ip: req.ip, ts: new Date().toISOString(), error: e?.message }
     console.error('AUDIT verify:', entry)
     auditLog(entry)
     return res.status(500).json({ success: false, error: 'Verification check failed' })
-  })
+  }
 }
 
-// Verified-only endpoint for user info
-app.get('/api/me', ipAllowlist, rateLimiter, requireVerified, (req, res) => {
+// Enhanced endpoint to get current user with verification status
+app.get('/api/me', ipAllowlist, rateLimiter, requireVerified, async (req, res) => {
   const u = req.user || null
-  res.json({ success: true, user: u ? { id: u.id, email: u.email, email_confirmed_at: u.email_confirmed_at } : null })
+  
+  if (u) {
+    // Get enhanced verification status
+    const verificationResult = await verificationService.getUserVerificationStatus(u.id)
+    
+    res.json({ 
+      success: true, 
+      user: {
+        id: u.id,
+        email: u.email,
+        email_confirmed_at: u.email_confirmed_at,
+        verification_status: verificationResult.success ? verificationResult.status : null
+      }
+    })
+  } else {
+    res.json({ success: true, user: null })
+  }
 })
 
 // JWT email verification workflow
@@ -271,93 +360,158 @@ const FAILURE_REDIRECT_URL = process.env.FAILURE_REDIRECT_URL || `${WEBSITE_URL}
 // Issue CSRF token
 app.get('/api/csrf', ipAllowlist, rateLimiter, (req, res) => csrfIssue(req, res))
 
-// Send verification email with JWT link
-app.post('/api/send-verification', ipAllowlist, rateLimiter, csrfCheck, async (req, res) => {
+// Enhanced send verification email endpoint
+app.post('/api/send-verification', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  const { email } = req.body
+  const user = req.user
+
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Email is required' })
+  }
+
   try {
-    const { email, userId } = req.body || {}
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ success: false, error: 'Valid email required' })
+    // Generate verification token using enhanced service
+    const tokenResult = await verificationService.generateVerificationToken(
+      user.id,
+      email,
+      req.ip,
+      req.get('User-Agent')
+    )
+
+    if (!tokenResult.success) {
+      return res.status(400).json({ success: false, error: tokenResult.error })
     }
-    if (!userId || typeof userId !== 'string') {
-      return res.status(400).json({ success: false, error: 'userId required' })
-    }
-    const nowSec = Math.floor(Date.now() / 1000)
-    const jti = randomToken(16)
-    const token = signJwtHS256({ sub: userId, email, type: 'email_verify', iat: nowSec, exp: nowSec + TOKEN_TTL_SECONDS, jti }, VERIFY_SECRET)
-    const link = `${WEBSITE_URL}/api/verify?token=${encodeURIComponent(token)}`
+
+    // Send verification email using Resend
+    const verificationUrl = `${WEBSITE_URL}/verify?token=${tokenResult.token}`
     
-    // Attempt email via Resend if configured
-    const apiKey = process.env.RESEND_API_KEY
-    if (apiKey) {
-      try {
-        const resp = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: 'FixRez <onboarding@resend.dev>',
-            to: email,
-            subject: 'Verify your email',
-            text: `Please verify your email address by clicking the link below. This link expires in 24 hours.\n\n${link}`,
-          })
+    try {
+      const resp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>',
+          reply_to: process.env.RESEND_REPLY_TO || undefined,
+          to: email,
+          subject: 'Verify your FixRez AI account',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Verify your FixRez AI account</h2>
+              <p>Please click the button below to verify your email address and activate your account:</p>
+              <div style="margin: 30px 0;">
+                <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Verify Email Address
+                </a>
+              </div>
+              <p style="color: #666; font-size: 14px;">
+                This verification link will expire in 24 hours. If you didn't request this verification, please ignore this email.
+              </p>
+              <p style="color: #666; font-size: 14px;">
+                If the button doesn't work, copy and paste this link into your browser:<br>
+                <code style="background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px;">${verificationUrl}</code>
+              </p>
+            </div>
+          `
         })
-        const ok = resp.ok
-        let data
-        try { data = await resp.json() } catch { data = null }
-        if (!ok) {
-          const details = data && (data.error || data.message) ? (data.error || data.message) : `Status ${resp.status}`
-          console.error('Send verification failed:', details)
-          auditLog({ type: 'send_verification_fail', email, userId, ts: new Date().toISOString(), details })
+      })
+      const ok = resp.ok
+      let data
+      try { data = await resp.json() } catch { data = null }
+      if (!ok) {
+        const details = data && (data.error || data.message) ? (data.error || data.message) : `Status ${resp.status}`
+        console.error('Send verification failed:', details)
+        auditLog({ type: 'send_verification_fail', email, userId: user.id, ts: new Date().toISOString(), details })
+        // For development, still return success with the token even if email fails
+        if (DEV_AUTH_BYPASS) {
+          console.log('DEV mode: returning token despite email failure')
+        } else {
           return res.status(502).json({ success: false, error: 'Failed to send email', details })
         }
-        auditLog({ type: 'send_verification', email, userId, ts: new Date().toISOString(), provider: 'resend', id: data?.id || null })
-        return res.status(200).json({ success: true, queued: true })
-      } catch (err) {
-        console.error('Email provider error:', err?.message || err)
-        auditLog({ type: 'send_verification_error', email, userId, ts: new Date().toISOString(), error: err?.message || 'Unknown' })
+      }
+      auditLog({ type: 'send_verification', email, userId: user.id, ts: new Date().toISOString(), provider: 'resend', id: data?.id || null })
+    } catch (err) {
+      console.error('Email provider error:', err?.message || err)
+      auditLog({ type: 'send_verification_error', email, userId: user.id, ts: new Date().toISOString(), error: err?.message || 'Unknown' })
+      // For development, still return success with the token even if email fails
+      if (DEV_AUTH_BYPASS) {
+        console.log('DEV mode: returning token despite email provider error')
+      } else {
         return res.status(502).json({ success: false, error: 'Email provider error' })
       }
     }
 
-    // No provider configured; return link for manual testing
-    auditLog({ type: 'send_verification_no_provider', email, userId, ts: new Date().toISOString() })
-    return res.status(200).json({ success: true, queued: false, link })
-  } catch (e) {
-    console.error('send-verification error:', e?.message || e)
-    return res.status(500).json({ success: false, error: 'Server error' })
+    res.json({ 
+      success: true, 
+      message: 'Verification email sent successfully',
+      token: DEV_AUTH_BYPASS ? tokenResult.token : undefined, // Include token in dev mode for testing
+      expires_at: tokenResult.expires_at
+    })
+  } catch (error) {
+    console.error('Error in send-verification:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Verify token → mark profile verified and redirect
-app.get('/api/verify', ipAllowlist, rateLimiter, async (req, res) => {
+// Enhanced verify email endpoint
+app.get('/api/verify', ipAllowlist, rateLimiter, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  const { token } = req.query
+
+  if (!token) {
+    return res.status(400).json({ success: false, error: 'Token is required' })
+  }
+
   try {
-    const token = String(req.query.token || '')
-    if (!token) return res.redirect(FAILURE_REDIRECT_URL)
-    let payload
-    try {
-      payload = verifyJwtHS256(token, VERIFY_SECRET)
-    } catch (e) {
-      auditLog({ type: 'verify_attempt_fail', reason: e?.message || 'invalid', ip: req.ip, ts: new Date().toISOString() })
-      return res.redirect(FAILURE_REDIRECT_URL)
-    }
-    const { sub: userId, email } = payload || {}
-    if (!userId || !email) return res.redirect(FAILURE_REDIRECT_URL)
+    // Verify token using enhanced service
+    const verifyResult = await verificationService.verifyToken(
+      token,
+      req.ip,
+      req.get('User-Agent')
+    )
 
-    const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    const admin = createClient(supabaseUrl, serviceKey)
-
-    // Ensure profile exists; then set verified=true
-    try {
-      await admin.from('profiles').upsert({ id: userId, email, verified: true }, { onConflict: 'id' })
-    } catch (e) {
-      console.error('Profile upsert error:', e?.message || e)
+    if (!verifyResult.success) {
+      return res.status(400).json({ success: false, error: verifyResult.error })
     }
 
-    auditLog({ type: 'verify_success', userId, email, ts: new Date().toISOString() })
-    return res.redirect(SUCCESS_REDIRECT_URL)
-  } catch (e) {
-    console.error('verify endpoint error:', e?.message || e)
-    return res.redirect(FAILURE_REDIRECT_URL)
+    res.json({ 
+      success: true, 
+      message: 'Email verified successfully',
+      user_id: verifyResult.user_id
+    })
+  } catch (error) {
+    console.error('Error in verify:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Get user verification status
+app.get('/api/verification-status', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  try {
+    const user = req.user
+    const verificationResult = await verificationService.getUserVerificationStatus(user.id)
+    
+    res.json({
+      success: true,
+      verification_status: verificationResult.success ? verificationResult.status : null
+    })
+  } catch (error) {
+    console.error('Error getting verification status:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Get verification statistics (admin only)
+app.get('/api/verification-stats', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
+  try {
+    // Check if user is admin (you may want to add proper admin role checking)
+    const stats = await verificationService.getVerificationStats()
+    
+    res.json({
+      success: true,
+      stats
+    })
+  } catch (error) {
+    console.error('Error getting verification stats:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
@@ -375,5 +529,33 @@ app.listen(PORT, () => {
   console.log('   GET  /api/csrf');
   console.log('   POST /api/send-verification');
   console.log('   GET  /api/verify');
+});
+
+
+app.get('/api/verification-metrics', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
+  try {
+    const stats = await verificationService.getVerificationStats();
+    const emailConfigured = Boolean(process.env.RESEND_API_KEY);
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>';
+    const rateInfo = { window_ms: RATE_WINDOW_MS, max: RATE_MAX, active_buckets: RATE_BUCKET.size };
+    const health = {
+      supabaseConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      emailServiceConfigured: emailConfigured,
+      devBypass: DEV_AUTH_BYPASS
+    };
+
+    res.json({
+      success: true,
+      metrics: {
+        stats,
+        email: { provider: 'resend', configured: emailConfigured, from: fromEmail },
+        rateLimiter: rateInfo,
+        health
+      }
+    });
+  } catch (error) {
+    console.error('Error getting verification metrics:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 

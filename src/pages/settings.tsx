@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import LogoutButton from '@/components/LogoutButton'
 import { isVerified, resendVerification, canResend, getResendCooldownRemaining } from '@/lib/auth'
+import VerificationIndicator from '@/components/VerificationIndicator'
 
 const SettingsPage: React.FC = () => {
-  const { user } = useAuthStore()
+  const { user, verificationStatus } = useAuthStore()
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [cooldownMs, setCooldownMs] = useState<number>(getResendCooldownRemaining())
 
@@ -107,18 +108,54 @@ const SettingsPage: React.FC = () => {
 
         {/* Verification section */}
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">Email Verification</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">
-            Status: {verified ? 'Verified ✅' : 'Not Verified ❌'}
-          </p>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-4">Email Verification</h2>
+          
+          {/* Enhanced verification indicator */}
+          <div className="mb-4">
+            <VerificationIndicator size="lg" />
+          </div>
+
+          {/* Detailed verification status */}
+          <div className="space-y-3">
+            {verificationStatus && (
+              <>
+                <div className="flex items-center gap-2">
+                  {verificationStatus.is_verified ? (
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-red-500" />
+                  )}
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {verificationStatus.is_verified ? 'Email Verified' : 'Email Not Verified'}
+                  </span>
+                </div>
+                
+                {verificationStatus.verification_timestamp && (
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Verified on: {new Date(verificationStatus.verification_timestamp).toLocaleDateString()}
+                  </div>
+                )}
+                
+                {verificationStatus.has_valid_token && (
+                  <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                    <Clock className="w-4 h-4" />
+                    Verification token valid until {new Date(verificationStatus.token_expires_at).toLocaleString()}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           {!verified && (
-            <button
-              onClick={handleResend}
-              disabled={resendDisabled}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-            >
-              {resendLabel}
-            </button>
+            <div className="mt-4">
+              <button
+                onClick={handleResend}
+                disabled={resendDisabled}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {resendLabel}
+              </button>
+            </div>
           )}
         </section>
 
