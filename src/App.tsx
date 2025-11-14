@@ -18,22 +18,12 @@ import AccessibilityPage from './pages/accessibility'
 import SecurityPage from './pages/security'
 import { Toaster } from 'sonner'
 import Footer from '@/components/Footer'
-<<<<<<< HEAD
 
 function App() {
   const { user, setUser, setVerificationStatus, logout } = useAuthStore()
   
   // Check URL path to determine initial view
   const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' => {
-=======
-import SocialShareButtons from '@/components/SocialShareButtons'
-
-function App() {
-  const { user, setUser, setVerificationStatus, logout } = useAuthStore()
-  
-  // Check URL path to determine initial view
-  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' => {
->>>>>>> 6ae1463aa0e5836c40e3f474f1cdc846c52f9e9d
     const path = window.location.pathname
     if (path === '/optimize') return 'wizard'
     if (path === '/terms') return 'terms'
