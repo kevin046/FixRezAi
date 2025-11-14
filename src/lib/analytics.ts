@@ -19,7 +19,7 @@ export function initAnalytics() {
   gtag('config', measurementId, { send_page_view: true, anonymize_ip: true })
 }
 
-type OptimizationEvent = {
+export type OptimizationEvent = {
   id: string
   ts: number
   jobTitle: string
@@ -27,7 +27,7 @@ type OptimizationEvent = {
   durationSec: number
 }
 
-type ExportEvent = {
+export type ExportEvent = {
   id: string
   ts: number
   format: 'pdf' | 'text' | 'json' | 'linkedin'
