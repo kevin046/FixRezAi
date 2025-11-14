@@ -161,7 +161,8 @@ function App() {
         }
   
         if (response.ok) {
-          const data = await response.json()
+          const ct = response.headers.get('content-type') || ''
+          const data = ct.includes('application/json') ? await response.json() : null
           if (data.success && (data.status || data.verification_status)) {
             setVerificationStatus(data.status || data.verification_status)
           }

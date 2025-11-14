@@ -24,8 +24,8 @@ const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http:
   .filter(Boolean)
 
 // Dev bypass flag
-const DEV_AUTH_BYPASS = (String(process.env.DEV_AUTH_BYPASS || '').toLowerCase() === 'true') && (process.env.NODE_ENV !== 'production');
-console.log('🔧 DEV_AUTH_BYPASS:', DEV_AUTH_BYPASS ? 'enabled' : 'disabled')
+const DEV_AUTH_BYPASS = false;
+console.log('🔧 DEV_AUTH_BYPASS:', 'disabled')
 
 const corsOptions = {
   origin: function(origin, callback) {

@@ -86,9 +86,14 @@ export const useAuthStore = create<AuthState>()(
           })
           
           let result: any = null
-          try {
-            result = await response.json()
-          } catch {}
+          const ct = response.headers.get('content-type') || ''
+          if (ct.includes('application/json')) {
+            try { result = await response.json() } catch {}
+          } else {
+            const text = await response.text()
+            set({ error: text || 'Invalid response type from verification status endpoint' })
+            return
+          }
           if (response.ok && result?.success) {
             const s = result.status || {}
             set({ verificationStatus: {
