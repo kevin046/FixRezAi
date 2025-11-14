@@ -9,9 +9,8 @@ export function isVerified(user: User | null): boolean {
   if (verificationStatus) {
     return Boolean(verificationStatus.verified ?? (verificationStatus as any).is_verified)
   }
-  
-  // Fallback to legacy verification methods
-  return !!(user?.email_confirmed_at || (user as any)?.user_metadata?.verified)
+  // If no status yet, default to not verified to avoid false positives
+  return false
 }
 
 const RESEND_KEY = 'fixrez_resend_verification_at'

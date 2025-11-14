@@ -200,7 +200,7 @@ export default function VerifyPage() {
       </nav>
 
       {/* Content */}
-      <div className="container mx-auto max-w-md px-4 py-10">
+      <div className="container mx-auto max-w-2xl px-4 py-10">
         {/* Explicit Not Verified banner */}
         {!status && (
           <div className="mb-4 rounded-lg border px-4 py-3 border-red-300 bg-red-50 text-red-700">
@@ -212,11 +212,12 @@ export default function VerifyPage() {
           </div>
         )}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Verify your email</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Verify your email</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
             To use FixRez AI, please verify your email by clicking the link sent to{' '}
             <span className="font-medium">{email || 'your inbox'}</span>.
           </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Secure verification protects your account and enables access to all features.</p>
 
           {status && (
             <div className={`mb-4 rounded-lg border px-4 py-3 ${status.type === 'success' ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>
@@ -272,6 +273,31 @@ export default function VerifyPage() {
             {checkResult && (
               <div className={`rounded-lg border px-4 py-3 ${checkResult.ok ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>{checkResult.details}</div>
             )}
+            <button
+              onClick={async () => {
+                try {
+                  const apiBase = getApiBase()
+                  const { data: { session } } = await supabase.auth.getSession()
+                  const token = session?.access_token
+                  const resp = await fetch(`${apiBase}/auth/reauth-link`, {
+                    method: 'POST',
+                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' }
+                  })
+                  let payload: any = null
+                  try { payload = await resp.json() } catch {}
+                  if (resp.ok && payload?.success && payload?.action_link) {
+                    window.location.assign(payload.action_link)
+                  } else {
+                    setStatus({ type: 'error', message: payload?.error || resp.statusText || 'Failed to generate reauth link' })
+                  }
+                } catch (e: any) {
+                  setStatus({ type: 'error', message: e?.message || 'Failed to generate reauth link' })
+                }
+              }}
+              className="w-full py-2 rounded-xl text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Re-authenticate (generate link)
+            </button>
             <button
               onClick={async () => {
                 try {
