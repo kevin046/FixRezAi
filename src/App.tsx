@@ -309,24 +309,10 @@ function App() {
   }
 
   return (
-<<<<<<< HEAD
     <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
       <div className="flex-1">
         {renderView()}
       </div>
-=======
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      {renderView()}
-      
-      {/* Social Share Buttons - Show on home page */}
-      {currentView === 'home' && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <SocialShareButtons />
-        </div>
-      )}
-      
-      {/* Footer */}
->>>>>>> 6ae1463aa0e5836c40e3f474f1cdc846c52f9e9d
       <Footer />
       <Toaster position="top-right" />
     </div>
