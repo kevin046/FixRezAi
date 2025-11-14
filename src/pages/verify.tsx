@@ -109,7 +109,6 @@ export default function VerifyPage() {
     setCooldownMs(getResendCooldownRemaining())
     setStatus(res.success ? { type: 'success', message: res.message } : { type: 'error', message: res.message })
     const token = (res as any).token as string | undefined
-    if (token) setDevToken(token)
   }
 
   const handleGoToLogin = () => {
@@ -128,46 +127,9 @@ export default function VerifyPage() {
   const cooldownSeconds = Math.ceil(cooldownMs / 1000)
   const resendDisabled = loading || cooldownMs > 0
   const resendLabel = loading ? 'Sending...' : (cooldownMs > 0 ? `Resend in ${cooldownSeconds}s` : 'Resend verification email')
-  const [checking, setChecking] = useState(false)
-  const [checkResult, setCheckResult] = useState<{ ok: boolean; details: string } | null>(null)
-  const [devToken, setDevToken] = useState<string | null>(null)
-  const [testingSupabase, setTestingSupabase] = useState(false)
+  
 
-  const handleCheckConfig = async () => {
-    try {
-      setChecking(true)
-      setCheckResult({ ok: true, details: 'Checking…' })
-      const apiBase = getApiBase()
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-      const resp = await fetch(`${apiBase}/verification-metrics`, {
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
-      })
-      let payload: any = null
-      try { payload = await resp.json() } catch {}
-      if (!resp.ok || !payload?.success) {
-        const msg = payload?.error || resp.statusText || 'Failed to load metrics'
-        setCheckResult({ ok: false, details: msg })
-        return
-      }
-      const emailCfg = Boolean(payload?.metrics?.email?.configured)
-      const supaCfg = Boolean(payload?.metrics?.health?.supabaseConfigured)
-      const devBypass = Boolean(payload?.metrics?.health?.devBypass)
-      const provider = String(payload?.metrics?.email?.provider || 'resend')
-      const from = String(payload?.metrics?.email?.from || '')
-      const lines = [] as string[]
-      lines.push(`Email provider: ${provider}`)
-      if (from) lines.push(`From: ${from}`)
-      lines.push(`Email service configured: ${emailCfg ? 'Yes' : 'No'}`)
-      lines.push(`Supabase service key configured: ${supaCfg ? 'Yes' : 'No'}`)
-      lines.push(`Dev bypass: ${devBypass ? 'On' : 'Off'}`)
-      setCheckResult({ ok: emailCfg && supaCfg, details: lines.join(' • ') })
-    } catch (e: any) {
-      setCheckResult({ ok: false, details: e?.message || 'Unknown error' })
-    } finally {
-      setChecking(false)
-    }
-  }
+  
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
@@ -233,128 +195,8 @@ export default function VerifyPage() {
             >
               {resendLabel}
             </button>
-            <button
-              onClick={handleCheckConfig}
-              disabled={checking}
-              className="w-full py-2 rounded-xl text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              {checking ? 'Checking…' : 'Test email configuration'}
-            </button>
-            <button
-              onClick={async () => {
-                if (!email) return
-                setTestingSupabase(true)
-                try {
-                  const { data: { session } } = await supabase.auth.getSession()
-                  const token = session?.access_token
-                  const apiBase = getApiBase()
-                  const resp = await fetch(`${apiBase}/send-verification`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                    body: JSON.stringify({ email })
-                  })
-                  let payload: any = null
-                  try { payload = await resp.json() } catch {}
-                  if (resp.ok && payload?.success) {
-                    setStatus({ type: 'success', message: payload?.message || 'Test email sent. Check your inbox.' })
-                  } else {
-                    const msg = payload?.error || resp.statusText || 'Failed to send test email'
-                    setStatus({ type: 'error', message: msg })
-                  }
-                } finally {
-                  setTestingSupabase(false)
-                }
-              }}
-              disabled={testingSupabase}
-              className="w-full py-2 rounded-xl text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              {testingSupabase ? 'Sending…' : 'Send test verification email'}
-            </button>
-            {checkResult && (
-              <div className={`rounded-lg border px-4 py-3 ${checkResult.ok ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>{checkResult.details}</div>
-            )}
-            <button
-              onClick={async () => {
-                try {
-                  const apiBase = getApiBase()
-                  const { data: { session } } = await supabase.auth.getSession()
-                  const token = session?.access_token
-                  const resp = await fetch(`${apiBase}/auth/reauth-link`, {
-                    method: 'POST',
-                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' }
-                  })
-                  let payload: any = null
-                  try { payload = await resp.json() } catch {}
-                  if (resp.ok && payload?.success && payload?.action_link) {
-                    window.location.assign(payload.action_link)
-                  } else {
-                    setStatus({ type: 'error', message: payload?.error || resp.statusText || 'Failed to generate reauth link' })
-                  }
-                } catch (e: any) {
-                  setStatus({ type: 'error', message: e?.message || 'Failed to generate reauth link' })
-                }
-              }}
-              className="w-full py-2 rounded-xl text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              Re-authenticate (generate link)
-            </button>
-            <button
-              onClick={async () => {
-                try {
-                  const apiBase = getApiBase()
-                  const { data: { session } } = await supabase.auth.getSession()
-                  const token = session?.access_token
-                  const resp = await fetch(`${apiBase}/auth/reauth-link`, {
-                    method: 'POST',
-                    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' }
-                  })
-                  let payload: any = null
-                  try { payload = await resp.json() } catch {}
-                  if (resp.ok && payload?.success && payload?.action_link) {
-                    window.location.assign(payload.action_link)
-                  } else {
-                    setStatus({ type: 'error', message: payload?.error || resp.statusText || 'Failed to generate reauth link' })
-                  }
-                } catch (e: any) {
-                  setStatus({ type: 'error', message: e?.message || 'Failed to generate reauth link' })
-                }
-              }}
-              className="w-full py-2 rounded-xl text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              Re-authenticate (generate link)
-            </button>
-            <button
-              onClick={async () => {
-                if (!email) return
-                try {
-                  const { data: { session } } = await supabase.auth.getSession()
-                  const token = session?.access_token
-                  const apiBase = getApiBase()
-                  const resp = await fetch(`${apiBase}/verification/create-token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-                    body: JSON.stringify({ email, type: 'email' })
-                  })
-                  let payload: any = null
-                  try { payload = await resp.json() } catch {}
-                  if (resp.ok && payload?.success && payload?.token) {
-                    setDevToken(String(payload.token))
-                    setStatus({ type: 'success', message: 'Generated test verification link.' })
-                  } else {
-                    const msg = payload?.error || resp.statusText || 'Failed to generate test link'
-                    setStatus({ type: 'error', message: msg })
-                  }
-                } catch (e: any) {
-                  setStatus({ type: 'error', message: e?.message || 'Failed to generate test link' })
-                }
-              }}
-              className="w-full py-2 rounded-xl text-white bg-purple-600 hover:bg-purple-700"
-            >
-              Generate test verification link
-            </button>
-            {devToken && (
-              <a href={`/verify?token=${encodeURIComponent(devToken)}`} className="w-full inline-block text-center py-2 rounded-xl text-white bg-purple-600 hover:bg-purple-700">Open test verification link</a>
-            )}
+            
+            
             <button
               onClick={handleGoToLogin}
               className="w-full py-2 rounded-xl text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
