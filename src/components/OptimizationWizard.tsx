@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
 import { JobTitleStep } from './wizard/JobTitleStep'
 import { JobDescriptionStep } from './wizard/JobDescriptionStep'
 import { ResumeUploadStep } from './wizard/ResumeUploadStep'
@@ -247,6 +247,12 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
                       Welcome, {user.email?.split('@')[0]}
                     </span>
                     <a
+                      href="/dashboard"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                    >
+                      Dashboard
+                    </a>
+                    <a
                       href="/settings"
                       className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                     >
@@ -381,21 +387,7 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
           )}
         </div>
 
-        {/* Footer identical to index */}
-        <footer className="py-10 border-t border-gray-200 dark:border-gray-700 mt-8">
-          <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">© 2025 Summit Pixels Inc.</p>
-              <div className="flex items-center gap-6 text-sm">
-                <a href="/terms" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Terms</a>
-                <a href="/privacy" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Privacy</a>
-                <a href="/contact" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Contact</a>
-                <span className="text-gray-400">•</span>
-                <span className="text-gray-600 dark:text-gray-300">Powered by Summit Pixels Inc.</span>
-              </div>
-            </div>
-          </div>
-        </footer>
+        
       </div>
     </div>
   )

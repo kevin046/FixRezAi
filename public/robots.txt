@@ -12,4 +12,4 @@ User-agent: CCBot
 Allow: /
 
 # Sitemaps
-Sitemap: https://fixrez-han4cbj05-kevin046s-projects.vercel.app/sitemap.xml
+Sitemap: https://www.fixrez.com/sitemap.xml

@@ -1,27 +1,63 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/</loc>
-    <lastmod>2025-11-05</lastmod>
+    <loc>https://www.fixrez.com/</loc>
+    <lastmod>2025-11-13</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/contact</loc>
-    <lastmod>2025-11-05</lastmod>
+    <loc>https://www.fixrez.com/optimize</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.fixrez.com/dashboard</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://www.fixrez.com/settings</loc>
+    <lastmod>2025-11-13</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/terms</loc>
-    <lastmod>2025-11-05</lastmod>
+    <loc>https://www.fixrez.com/verify</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.fixrez.com/contact</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://www.fixrez.com/terms</loc>
+    <lastmod>2025-11-13</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://fixrez-han4cbj05-kevin046s-projects.vercel.app/privacy</loc>
-    <lastmod>2025-11-05</lastmod>
+    <loc>https://www.fixrez.com/privacy</loc>
+    <lastmod>2025-11-13</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.fixrez.com/accessibility</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+  <url>
+    <loc>https://www.fixrez.com/security</loc>
+    <lastmod>2025-11-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
   </url>
 </urlset>

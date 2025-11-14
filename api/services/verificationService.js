@@ -80,7 +80,9 @@ class VerificationService {
     console.log('DEBUG: process.env.VERIFICATION_JWT_SECRET:', process.env.VERIFICATION_JWT_SECRET ? 'EXISTS' : 'MISSING');
     
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY is required');
+      this.admin = null;
+      this.initialized = true;
+      return;
     }
     this.admin = createClient(process.env.SUPABASE_URL || SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
     this.initialized = true;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { PieChart, BarChart2, Search, ArrowLeft, Target, CheckCircle, XCircle } from 'lucide-react'
+import { PieChart, BarChart2, Search, ArrowLeft, Target, CheckCircle, XCircle, Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
 import { getOptimizationHistory, type OptimizationEvent } from '@/lib/analytics'
 import { getExportStats } from '@/lib/analytics'
 import LogoutButton from '@/components/LogoutButton'
@@ -85,6 +85,12 @@ export default function DashboardPage() {
                     Welcome, {user.email?.split('@')[0]}
                   </span>
                   <VerificationIndicator size="sm" />
+                  <a
+                    href="/dashboard"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    Dashboard
+                  </a>
                   <a
                     href="/settings"
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
@@ -230,21 +236,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Footer (from index) */}
-      <footer className="py-10 border-t border-gray-200 dark:border-gray-700 mt-8">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">© 2025 Summit Pixels Inc.</p>
-            <div className="flex items-center gap-6 text-sm">
-              <a href="/terms" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Terms</a>
-              <a href="/privacy" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Privacy</a>
-              <a href="/contact" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Contact</a>
-              <span className="text-gray-400">•</span>
-              <span className="text-gray-600 dark:text-gray-300">Powered by Summit Pixels Inc.</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      
     </div>
   )
 }

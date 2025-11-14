@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { getApiBase } from '@/lib/http'
 
 export interface VerificationStatus {
   verified: boolean
@@ -75,24 +76,33 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('No authentication session found')
           }
           
-          // Use the new enhanced verification status endpoint
-          const response = await fetch(`/api/verification/status/${targetUserId}`, {
+          // Use the current-user verification status endpoint
+          const apiBase = getApiBase()
+          const response = await fetch(`${apiBase}/verification/status`, {
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
               'Content-Type': 'application/json'
             }
           })
           
-          if (!response.ok) {
-            throw new Error(`Failed to fetch verification status: ${response.statusText}`)
-          }
-          
-          const result = await response.json()
-          
-          if (result.success) {
-            set({ verificationStatus: result.status })
+          let result: any = null
+          try {
+            result = await response.json()
+          } catch {}
+          if (response.ok && result?.success) {
+            const s = result.status || {}
+            set({ verificationStatus: {
+              verified: Boolean(s.is_verified ?? s.verified ?? false),
+              verification_timestamp: s.verification_timestamp ?? null,
+              verification_method: s.verification_method ?? null,
+              verification_token_id: s.verification_token_id ?? null,
+              verification_metadata: null,
+              has_valid_token: Boolean(s.has_valid_token ?? false),
+              token_expires_at: s.token_expires_at ?? null
+            } })
           } else {
-            throw new Error(result.error || 'Failed to fetch verification status')
+            const msg = (result?.error || response.statusText || 'Failed to fetch verification status')
+            set({ error: msg })
           }
         } catch (error: any) {
           console.error('Failed to fetch verification status:', error)

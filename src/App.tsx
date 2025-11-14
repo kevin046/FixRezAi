@@ -9,17 +9,21 @@ import SettingsPage from './pages/settings'
 import VerifyPage from './pages/verify'
 import DashboardPage from './pages/dashboard'
 import { useAuthStore } from './stores/authStore'
+import { getApiBase } from '@/lib/http'
 import { supabase } from './lib/supabase'
 import { secureLogout, isVerified, syncVerifiedMetadata } from './lib/auth'
 import { VerificationStatus } from './stores/authStore'
 import AdminMetricsPage from './pages/AdminMetrics'
+import AccessibilityPage from './pages/accessibility'
+import SecurityPage from './pages/security'
 import { Toaster } from 'sonner'
+import Footer from '@/components/Footer'
 
 function App() {
   const { user, setUser, setVerificationStatus, logout } = useAuthStore()
   
   // Check URL path to determine initial view
-  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' => {
+  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' => {
     const path = window.location.pathname
     if (path === '/optimize') return 'wizard'
     if (path === '/terms') return 'terms'
@@ -30,14 +34,16 @@ function App() {
     if (path === '/verify') return 'verify'
     if (path === '/dashboard') return 'dashboard'
     if (path === '/admin/metrics') return 'adminMetrics'
+    if (path === '/accessibility') return 'accessibility'
+    if (path === '/security') return 'security'
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics'>(
+  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security'>(
     getInitialView()
   )
 
-  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics') => {
+  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security') => {
     if (view === 'wizard' && user && !isVerified(user)) {
       view = 'verify'
     }
@@ -53,6 +59,8 @@ function App() {
     else if (view === 'verify') path = '/verify'
     else if (view === 'dashboard') path = '/dashboard'
     else if (view === 'adminMetrics') path = '/admin/metrics'
+    else if (view === 'accessibility') path = '/accessibility'
+    else if (view === 'security') path = '/security'
     window.history.pushState({}, '', path)
   }
 
@@ -135,7 +143,8 @@ function App() {
     const run = (async () => {
       try {
         const token = (await supabase.auth.getSession()).data.session?.access_token
-        const response = await fetch('/api/verification-status', {
+        const apiBase = getApiBase()
+        const response = await fetch(`${apiBase}/verification/status`, {
           headers: {
             'Authorization': `Bearer ${token ?? ''}`
           }
@@ -147,14 +156,14 @@ function App() {
           const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 15
           const backoffMs = Math.max(VERIFICATION_COOLDOWN_MS, (retryAfterSeconds || 15) * 1000)
           nextAllowedFetchTimeRef.current = Date.now() + backoffMs
-          console.warn('Rate limited on /api/verification-status. Backing off for', backoffMs, 'ms')
+          console.warn('Rate limited on /api/verification/status. Backing off for', backoffMs, 'ms')
           return
         }
   
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.verification_status) {
-            setVerificationStatus(data.verification_status)
+          if (data.success && (data.status || data.verification_status)) {
+            setVerificationStatus(data.status || data.verification_status)
           }
           // Successful request resets allowed time window
           nextAllowedFetchTimeRef.current = Date.now() + VERIFICATION_COOLDOWN_MS
@@ -279,14 +288,21 @@ function App() {
         return <DashboardPage />
       case 'adminMetrics':
         return <AdminMetricsPage />
+      case 'accessibility':
+        return <AccessibilityPage />
+      case 'security':
+        return <SecurityPage />
       default:
         return <Hero onGetStarted={handleGetStarted} user={user} onLogout={handleLogout} />
     }
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      {renderView()}
+    <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
+      <div className="flex-1">
+        {renderView()}
+      </div>
+      <Footer />
       <Toaster position="top-right" />
     </div>
   )
@@ -294,3 +310,4 @@ function App() {
 
 export default App
 
+

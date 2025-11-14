@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Medal, Star, Sparkles, FileText, Download, ArrowRight } from "lucide-react";
+import { Medal, Star, Sparkles, FileText, Download, ArrowRight, Linkedin, Twitter, Instagram, Facebook } from "lucide-react";
 import { useEffect, useState } from "react";
 import rbcLogo from "@/assets/logos/rbc.svg";
 import bmoLogo from "@/assets/logos/bmo.svg";
@@ -101,6 +101,18 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
     }
   }, [])
 
+  useEffect(() => {
+    try {
+      const footers = document.querySelectorAll('footer')
+      footers.forEach(f => {
+        const text = (f.textContent || '').toLowerCase()
+        if (text.includes('fixrez ai') || text.includes('ai resume optimization tool') || text.includes('© 2024')) {
+          (f as HTMLElement).style.display = 'none'
+        }
+      })
+    } catch {}
+  }, [])
+
   return (
     <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
       {logoutStatus && (
@@ -128,6 +140,12 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   >
                     Dashboard
+                  </a>
+                  <a
+                    href="/settings"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    Settings
                   </a>
                   <LogoutButton
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
@@ -185,19 +203,15 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
               Start Optimizing
               <ArrowRight className="w-4 h-4 ml-2" />
             </button>
-            <button 
-              onClick={() => {
-                if (user) {
-                  setShowATSRating(true)
-                } else {
-                  window.location.href = '/auth?mode=login'
-                }
-              }}
-              className="w-full sm:w-auto px-6 py-3 text-sm font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-full hover:bg-blue-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center justify-center"
-            >
-              ATS Rating
-              <Medal className="w-4 h-4 ml-2" />
-            </button>
+            {user && (
+              <button 
+                onClick={() => setShowATSRating(true)}
+                className="w-full sm:w-auto px-6 py-3 text-sm font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-full hover:bg-blue-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center justify-center"
+              >
+                ATS Rating
+                <Medal className="w-4 h-4 ml-2" />
+              </button>
+            )}
           </div>
           
           {/* ATS Rating Modal */}
@@ -320,20 +334,7 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
           </div>
         </div>
       </div>
-      <footer className="py-10 border-t border-gray-200 dark:border-gray-700">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">© 2025 Summit Pixels Inc.</p>
-            <div className="flex items-center gap-6 text-sm">
-              <a href="/terms" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Terms</a>
-              <a href="/privacy" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Privacy</a>
-              <a href="/contact" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Contact</a>
-              <span className="text-gray-400">•</span>
-              <span className="text-gray-600 dark:text-gray-300">Powered by Summit Pixels Inc.</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      
     </div>
   )
 }

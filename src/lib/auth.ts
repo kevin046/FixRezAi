@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getApiBase } from '@/lib/http'
 import type { User } from '@supabase/supabase-js'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -6,7 +7,7 @@ export function isVerified(user: User | null): boolean {
   // First check enhanced verification status from auth store
   const verificationStatus = useAuthStore.getState().verificationStatus
   if (verificationStatus) {
-    return verificationStatus.verified
+    return Boolean(verificationStatus.verified ?? (verificationStatus as any).is_verified)
   }
   
   // Fallback to legacy verification methods
@@ -14,7 +15,7 @@ export function isVerified(user: User | null): boolean {
 }
 
 const RESEND_KEY = 'fixrez_resend_verification_at'
-const RESEND_COOLDOWN_MS = 300_000 // 5 minutes cooldown to avoid 429s
+const RESEND_COOLDOWN_MS = 5_000
 let resendInFlight = false
 
 // Guard variables for verified metadata sync
@@ -37,12 +38,13 @@ export function canResend(): boolean {
   return getResendCooldownRemaining() <= 0 && !resendInFlight
 }
 
-export async function resendVerification(email: string): Promise<{ success: boolean; message: string }> {
+export async function resendVerification(email: string): Promise<{ success: boolean; message: string; token?: string }> {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { success: false, message: 'Please enter a valid email address.' }
   }
 
   try {
+    console.log('🔄 Resend verification requested for:', email)
     const remaining = getResendCooldownRemaining()
     if (remaining > 0) {
       const seconds = Math.ceil(remaining / 1000)
@@ -54,24 +56,67 @@ export async function resendVerification(email: string): Promise<{ success: bool
 
     resendInFlight = true
 
-    const { error } = await supabase.auth.resend({
-      type: 'signup',
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/verify` }
-    })
-    if (error) {
-      const msg = (error.message || '').toLowerCase()
-      if (msg.includes('too many') || msg.includes('rate')) {
-        // Stamp cooldown now to prevent immediate retries
-        try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
-        return { success: false, message: 'Too many requests. Please wait a few minutes and try again.' }
-      }
-      return { success: false, message: error.message }
+    const { error: reauthErr } = await supabase.auth.reauthenticate()
+    if (!reauthErr) {
+      try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
+      return { success: true, message: 'Verification email sent. Check your inbox.' }
     }
 
+    // Get the current session for authentication
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+
+    if (!token) {
+      console.warn('⚠️ No session token found - user may need to sign in')
+      // Still try to proceed, but the backend requires auth
+    }
+
+    console.log('📧 Calling backend API to resend verification email for:', email)
+    const apiBase = getApiBase()
+    const resp = await fetch(`${apiBase.replace(/\/$/, '')}/send-verification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ email })
+    })
+
+    let payload: any = null
+    try { 
+      payload = await resp.json() 
+    } catch (e) {
+      console.error('❌ Failed to parse response:', e)
+    }
+
+    if (!resp.ok || !payload?.success) {
+      const errorMsg = payload?.error || payload?.message || resp.statusText || 'Failed to send verification email'
+      console.error('❌ Backend API error:', errorMsg)
+      console.error('Response status:', resp.status)
+      console.error('Response payload:', payload)
+      
+      // Provide more helpful error messages
+      let errorMessage = errorMsg
+      if (errorMsg.includes('not found') || errorMsg.includes('User not found')) {
+        errorMessage = 'No account found with this email address. Please sign up first.'
+      } else if (errorMsg.includes('already verified') || errorMsg.includes('verified')) {
+        errorMessage = 'This email is already verified.'
+      } else if (errorMsg.includes('rate limit') || errorMsg.includes('too many')) {
+        errorMessage = 'Too many requests. Please wait a few minutes before trying again.'
+      } else if (errorMsg.includes('not configured') || errorMsg.includes('Server not configured')) {
+        errorMessage = 'Email service is not configured. Please contact support.'
+      }
+      
+      return { success: false, message: errorMessage }
+    }
+
+    // Success - update cooldown
     try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
-    return { success: true, message: 'Verification email sent. Check your inbox.' }
+    console.log('✅ Verification email sent successfully to:', email)
+    console.log('📬 Response:', payload)
+    return { success: true, message: payload?.message || 'Verification email sent successfully! Please check your inbox (and spam folder) for the verification link. Click the link to verify your email address.' }
   } catch (e) {
+    console.error('❌ Resend verification exception:', e)
     return { success: false, message: e instanceof Error ? e.message : 'Failed to resend verification email.' }
   } finally {
     resendInFlight = false

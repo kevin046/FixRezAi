@@ -1,10 +1,9 @@
-
-import React from "react";
+import React from "react"
 import { useAuthStore } from '@/stores/authStore'
-import { ArrowLeft, Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import LogoutButton from '@/components/LogoutButton'
 
-const PrivacyPolicy: React.FC = () => {
+const AccessibilityPage: React.FC = () => {
   const { user } = useAuthStore()
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -17,7 +16,6 @@ const PrivacyPolicy: React.FC = () => {
 
   return (
     <div className="bg-gray-100 min-h-screen">
-      {/* Navigation identical to index */}
       <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
@@ -68,38 +66,22 @@ const PrivacyPolicy: React.FC = () => {
         </div>
       </nav>
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Privacy Policy</h1>
-        <p className="text-gray-600 mb-6">FixRez AI (fixrez.com) is owned and operated by Summit Pixels Inc.</p>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Accessibility</h1>
+        <p className="text-gray-600 mb-6">We aim to make FixRez AI usable for everyone.</p>
         <div className="bg-white p-6 rounded-lg shadow-md">
-          <p className="text-gray-700 mb-4">
-            This Privacy Policy describes how FixRez ("we", "us", or "our") collects, uses, and discloses your personal information when you use our website (the "Service").
-          </p>
-          <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-4">Information We Collect</h2>
-          <p className="text-gray-700 mb-4">
-            We may collect personal information that you provide to us, such as your name, email address, and other contact information. We may also collect information automatically when you use the Service, such as your IP address, browser type, and operating system.
-          </p>
-          <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-4">How We Use Your Information</h2>
-          <p className="text-gray-700 mb-4">
-            We may use the information we collect to provide and improve the Service, to communicate with you, and to comply with legal obligations. We will not sell or rent your personal information to third parties. All personal information is managed in accordance with Canadian privacy laws.
-          </p>
-          <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-4">Data Security</h2>
-          <p className="text-gray-700 mb-4">
-            We take reasonable measures to protect your personal information from unauthorized access, use, or disclosure. However, no method of transmission over the internet or electronic storage is 100% secure.
-          </p>
-          <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-4">Changes to This Privacy Policy</h2>
-          <p className="text-gray-700 mb-4">
-            We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.
-          </p>
-          <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-4">Contact Us</h2>
-        
-          <p className="text-gray-700">
-            If you have any questions about this Privacy Policy, please contact us.
-          </p>
+          <h2 className="text-2xl font-bold text-gray-800 mt-2 mb-4">Standards</h2>
+          <p className="text-gray-700 mb-4">The site follows WCAG 2.1 AA guidelines where possible, including semantic HTML, focus states, ARIA labels, and keyboard navigation.</p>
+          <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-4">Keyboard Navigation</h2>
+          <p className="text-gray-700 mb-4">All interactive elements are reachable via keyboard. Use Tab to move focus and Enter or Space to activate.</p>
+          <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-4">Contrast</h2>
+          <p className="text-gray-700 mb-4">We use accessible color palettes and support dark mode to maintain contrast across themes.</p>
+          <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-4">Feedback</h2>
+          <p className="text-gray-700">If you experience barriers, contact us via the Contact page or email hello@summitpixels.com.</p>
         </div>
       </div>
       
     </div>
-  );
-};
+  )
+}
 
-export default PrivacyPolicy;
+export default AccessibilityPage

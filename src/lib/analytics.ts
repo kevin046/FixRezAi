@@ -1,48 +1,77 @@
-export type ExportEvent = {
-  id: string
-  ts: number
-  format: 'pdf' | 'text' | 'json' | 'linkedin'
-  template?: 'modern' | 'classic' | 'executive'
+export function initAnalytics() {
+  const isProd = import.meta.env.PROD
+  const measurementId = import.meta.env.VITE_GA_MEASUREMENT_ID || 'G-3RFGG9GCS4'
+
+  if (!isProd) return
+
+  const script = document.createElement('script')
+  script.async = true
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`
+  document.head.appendChild(script)
+
+  ;(window as any).dataLayer = (window as any).dataLayer || []
+  function gtag(...args: any[]) {
+    ;(window as any).dataLayer.push(args)
+  }
+  ;(window as any).gtag = gtag
+
+  gtag('js', new Date())
+  gtag('config', measurementId, { send_page_view: true, anonymize_ip: true })
 }
 
-export type OptimizationEvent = {
+type OptimizationEvent = {
   id: string
   ts: number
   jobTitle: string
   status: 'success' | 'error'
-  durationSec?: number
+  durationSec: number
 }
 
-const KEY_EXPORTS = 'fixrez_exports'
-const KEY_OPTIMIZE = 'fixrez_optimize_history'
-
-export function logExport(evt: ExportEvent) {
-  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY_EXPORTS) : null
-  const arr: ExportEvent[] = raw ? JSON.parse(raw) : []
-  arr.push(evt)
-  if (typeof window !== 'undefined') window.localStorage.setItem(KEY_EXPORTS, JSON.stringify(arr))
+type ExportEvent = {
+  id: string
+  ts: number
+  format: 'pdf' | 'text' | 'json' | 'linkedin'
+  template?: string
 }
 
-export function logOptimization(evt: OptimizationEvent) {
-  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY_OPTIMIZE) : null
-  const arr: OptimizationEvent[] = raw ? JSON.parse(raw) : []
-  arr.push(evt)
-  if (typeof window !== 'undefined') window.localStorage.setItem(KEY_OPTIMIZE, JSON.stringify(arr))
+function getStore<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) as T : fallback
+  } catch {
+    return fallback
+  }
 }
 
-export function getExportStats() {
-  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY_EXPORTS) : null
-  const arr: ExportEvent[] = raw ? JSON.parse(raw) : []
-  const counts = arr.reduce<Record<string, number>>((acc, e) => {
-    acc[e.format] = (acc[e.format] || 0) + 1
-    return acc
-  }, {})
-  return { total: arr.length, counts }
+function setStore(key: string, value: any) {
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
 }
 
-export function getOptimizationHistory() {
-  const raw = typeof window !== 'undefined' ? window.localStorage.getItem(KEY_OPTIMIZE) : null
-  const arr: OptimizationEvent[] = raw ? JSON.parse(raw) : []
-  // Newest first
-  return arr.sort((a, b) => b.ts - a.ts)
+export function logOptimization(e: OptimizationEvent) {
+  const list = getStore<OptimizationEvent[]>('optimization_history', [])
+  list.unshift(e)
+  setStore('optimization_history', list.slice(0, 100))
+  const g = (window as any).gtag
+  if (import.meta.env.PROD && typeof g === 'function') {
+    g('event', 'optimization', { status: e.status, job_title: e.jobTitle, duration_sec: e.durationSec })
+  }
+}
+
+export function getOptimizationHistory(): OptimizationEvent[] {
+  return getStore<OptimizationEvent[]>('optimization_history', [])
+}
+
+export function logExport(e: ExportEvent) {
+  const stats = getStore<{ total: number; counts: Record<string, number> }>('export_stats', { total: 0, counts: {} })
+  stats.total += 1
+  stats.counts[e.format] = (stats.counts[e.format] || 0) + 1
+  setStore('export_stats', stats)
+  const g = (window as any).gtag
+  if (import.meta.env.PROD && typeof g === 'function') {
+    g('event', 'export', { format: e.format, template: e.template || 'default' })
+  }
+}
+
+export function getExportStats(): { total: number; counts: Record<string, number> } {
+  return getStore('export_stats', { total: 0, counts: {} })
 }

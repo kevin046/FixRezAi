@@ -372,82 +372,132 @@ app.post('/api/send-verification', ipAllowlist, rateLimiter, requireAuth, verifi
   }
 
   try {
-    // Generate verification token using enhanced service
-    const tokenResult = await verificationService.generateVerificationToken(
-      user.id,
-      email,
-      req.ip,
-      req.get('User-Agent')
-    )
+    // Prefer Resend if API key is available (more reliable than Supabase resend)
+    const hasResendKey = Boolean(process.env.RESEND_API_KEY)
+    const providerPref = String(process.env.EMAIL_PROVIDER || (hasResendKey ? 'resend' : 'supabase')).toLowerCase()
+    const useResend = providerPref === 'resend' || hasResendKey
 
-    if (!tokenResult.success) {
-      return res.status(400).json({ success: false, error: tokenResult.error })
+    if (useResend && hasResendKey) {
+      console.log('📧 Using Resend API to send verification email to:', email)
+      const tokenResult = await verificationService.generateVerificationToken(
+        user.id,
+        email,
+        req.ip,
+        req.get('User-Agent')
+      )
+
+      if (!tokenResult.success) {
+        console.error('❌ Failed to generate verification token:', tokenResult.error)
+        return res.status(400).json({ success: false, error: tokenResult.error })
+      }
+
+      const verificationUrl = `${WEBSITE_URL}/verify?token=${tokenResult.token}`
+      try {
+        console.log('📬 Sending email via Resend to:', email)
+        const resp = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>',
+            reply_to: process.env.RESEND_REPLY_TO || undefined,
+            to: email,
+            subject: 'Verify your FixRez AI account',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Verify your FixRez AI account</h2>
+                <p>Please click the button below to verify your email address and activate your account:</p>
+                <div style="margin: 30px 0;">
+                  <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                    Verify Email Address
+                  </a>
+                </div>
+                <p style="color: #666; font-size: 14px;">
+                  This verification link will expire in 24 hours. If you didn't request this verification, please ignore this email.
+                </p>
+                <p style="color: #666; font-size: 14px;">
+                  If the button doesn't work, copy and paste this link into your browser:<br>
+                  <code style="background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px;">${verificationUrl}</code>
+                </p>
+              </div>
+            `
+          })
+        })
+        const ok = resp.ok
+        let data
+        try { data = await resp.json() } catch { data = null }
+        if (!ok) {
+          const details = data && (data.error || data.message) ? (data.error || data.message) : `Status ${resp.status}`
+          console.error('❌ Resend API failed:', details)
+          auditLog({ type: 'send_verification_fail', email, userId: user.id, ts: new Date().toISOString(), details })
+          return res.status(502).json({ success: false, error: `Failed to send email: ${details}` })
+        }
+        console.log('✅ Email sent successfully via Resend. Email ID:', data?.id)
+        auditLog({ type: 'send_verification', email, userId: user.id, ts: new Date().toISOString(), provider: 'resend', id: data?.id || null })
+
+        return res.json({ success: true, message: 'Verification email sent successfully via Resend' })
+      } catch (err) {
+        console.error('❌ Resend API error:', err?.message || err)
+        auditLog({ type: 'send_verification_error', email, userId: user.id, ts: new Date().toISOString(), error: err?.message || 'Unknown' })
+        return res.status(502).json({ success: false, error: `Email provider error: ${err?.message || 'Unknown'}` })
+      }
     }
 
-    // Send verification email using Resend
-    const verificationUrl = `${WEBSITE_URL}/verify?token=${tokenResult.token}`
+    // Fallback to Supabase (less reliable - may not send if email already confirmed)
+    console.log('📧 Using Supabase admin client to resend verification email to:', email)
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!serviceKey) {
+      console.error('❌ Supabase service role key not configured')
+      return res.status(500).json({ success: false, error: 'Server not configured - missing Supabase service role key' })
+    }
+
+    const admin = createClient(supabaseUrl, serviceKey)
+    const { data: resendData, error: resendErr } = await admin.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${WEBSITE_URL}/verify` }
+    })
     
-    try {
-      const resp = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>',
-          reply_to: process.env.RESEND_REPLY_TO || undefined,
-          to: email,
-          subject: 'Verify your FixRez AI account',
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">Verify your FixRez AI account</h2>
-              <p>Please click the button below to verify your email address and activate your account:</p>
-              <div style="margin: 30px 0;">
-                <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  Verify Email Address
-                </a>
-              </div>
-              <p style="color: #666; font-size: 14px;">
-                This verification link will expire in 24 hours. If you didn't request this verification, please ignore this email.
-              </p>
-              <p style="color: #666; font-size: 14px;">
-                If the button doesn't work, copy and paste this link into your browser:<br>
-                <code style="background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px;">${verificationUrl}</code>
-              </p>
-            </div>
-          `
-        })
-      })
-      const ok = resp.ok
-      let data
-      try { data = await resp.json() } catch { data = null }
-      if (!ok) {
-        const details = data && (data.error || data.message) ? (data.error || data.message) : `Status ${resp.status}`
-        console.error('Send verification failed:', details)
-        auditLog({ type: 'send_verification_fail', email, userId: user.id, ts: new Date().toISOString(), details })
-        // For development, still return success with the token even if email fails
-        if (DEV_AUTH_BYPASS) {
-          console.log('DEV mode: returning token despite email failure')
-        } else {
-          return res.status(502).json({ success: false, error: 'Failed to send email', details })
+    if (resendErr) {
+      const details = resendErr.message || 'Unknown Supabase error'
+      console.error('❌ Supabase resend error:', details)
+      auditLog({ type: 'send_verification_fail_supabase', email, userId: user.id, ts: new Date().toISOString(), details })
+      
+      // If Supabase fails and Resend is available, try Resend as fallback
+      if (hasResendKey) {
+        console.log('🔄 Supabase failed, falling back to Resend...')
+        // Recursively call Resend logic (but prevent infinite loop)
+        const tokenResult = await verificationService.generateVerificationToken(user.id, email, req.ip, req.get('User-Agent'))
+        if (tokenResult.success) {
+          const verificationUrl = `${WEBSITE_URL}/verify?token=${tokenResult.token}`
+          try {
+            const resp = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                from: process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>',
+                to: email,
+                subject: 'Verify your FixRez AI account',
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"><h2>Verify your FixRez AI account</h2><p>Click <a href="${verificationUrl}">here</a> to verify your email.</p><p>Or copy this link: ${verificationUrl}</p></div>`
+              })
+            })
+            if (resp.ok) {
+              console.log('✅ Fallback to Resend succeeded')
+              return res.json({ success: true, message: 'Verification email sent successfully via Resend (fallback)' })
+            }
+          } catch (e) {
+            console.error('❌ Resend fallback also failed:', e)
+          }
         }
       }
-      auditLog({ type: 'send_verification', email, userId: user.id, ts: new Date().toISOString(), provider: 'resend', id: data?.id || null })
-    } catch (err) {
-      console.error('Email provider error:', err?.message || err)
-      auditLog({ type: 'send_verification_error', email, userId: user.id, ts: new Date().toISOString(), error: err?.message || 'Unknown' })
-      // For development, still return success with the token even if email fails
-      if (DEV_AUTH_BYPASS) {
-        console.log('DEV mode: returning token despite email provider error')
-      } else {
-        return res.status(502).json({ success: false, error: 'Email provider error' })
-      }
+      
+      return res.status(502).json({ success: false, error: `Supabase email error: ${details}` })
     }
-
-    res.json({ 
-      success: true, 
-      message: 'Verification email sent successfully',
-      token: DEV_AUTH_BYPASS ? tokenResult.token : undefined, // Include token in dev mode for testing
-      expires_at: tokenResult.expires_at
-    })
+    
+    console.log('✅ Supabase resend completed (but may not have sent if email already confirmed)')
+    console.log('📬 Supabase response:', resendData)
+    auditLog({ type: 'send_verification_supabase', email, userId: user.id, ts: new Date().toISOString() })
+    return res.json({ success: true, message: 'Supabase verification email sent successfully (note: may not send if email already confirmed)' })
   } catch (error) {
     console.error('Error in send-verification:', error)
     res.status(500).json({ success: false, error: 'Internal server error' })
@@ -463,7 +513,28 @@ app.get('/api/verify', ipAllowlist, rateLimiter, verificationMiddleware.logVerif
   }
 
   try {
-    // Verify token using enhanced service
+    const hasServiceKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    if (!hasServiceKey) {
+      try {
+        const parts = String(token).split('.')
+        if (parts.length !== 3) throw new Error('Malformed token')
+        const [p1, p2, sig] = parts
+        const data = `${p1}.${p2}`
+        const expected = crypto.createHmac('sha256', VERIFY_SECRET).update(data).digest('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+        if (sig !== expected) throw new Error('Invalid signature')
+        const payload = JSON.parse(Buffer.from(p2.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'))
+        const nowSec = Math.floor(Date.now() / 1000)
+        if (typeof payload.exp === 'number' && nowSec > payload.exp) throw new Error('Token expired')
+        const url = new URL(SUCCESS_REDIRECT_URL)
+        url.searchParams.set('user_id', payload.sub || '')
+        return res.redirect(url.toString())
+      } catch (e) {
+        const url = new URL(FAILURE_REDIRECT_URL)
+        url.searchParams.set('error', e?.message || 'invalid')
+        return res.redirect(url.toString())
+      }
+    }
+
     const verifyResult = await verificationService.verifyToken(
       token,
       req.ip,
@@ -471,30 +542,59 @@ app.get('/api/verify', ipAllowlist, rateLimiter, verificationMiddleware.logVerif
     )
 
     if (!verifyResult.success) {
-      return res.status(400).json({ success: false, error: verifyResult.error })
+      const url = new URL(FAILURE_REDIRECT_URL)
+      url.searchParams.set('error', verifyResult.error || 'invalid')
+      return res.redirect(url.toString())
     }
 
-    res.json({ 
-      success: true, 
-      message: 'Email verified successfully',
-      user_id: verifyResult.user_id
-    })
+    const url = new URL(SUCCESS_REDIRECT_URL)
+    url.searchParams.set('user_id', verifyResult.userId || '')
+    return res.redirect(url.toString())
   } catch (error) {
     console.error('Error in verify:', error)
     res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Get user verification status
-app.get('/api/verification-status', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+// Get enhanced verification status for current user
+app.get('/api/verification/status', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
   try {
     const user = req.user
-    const verificationResult = await verificationService.getUserVerificationStatus(user.id)
-    
-    res.json({
-      success: true,
-      verification_status: verificationResult.success ? verificationResult.status : null
-    })
+    const hasKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    if (!hasKey || DEV_AUTH_BYPASS) {
+      return res.json({ success: true, status: { is_verified: false, verification_timestamp: null, verification_method: null, verification_token_id: null, has_valid_token: false, token_expires_at: null } })
+    }
+    const statusResult = await verificationServiceEnhanced.getUserVerificationStatus(user.id)
+    if (!statusResult.success) {
+      return res.status(400).json({ success: false, error: statusResult.error })
+    }
+    res.json({ success: true, status: statusResult.status })
+  } catch (error) {
+    console.error('Error getting verification status:', error)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Get enhanced verification status for specific user (admin only)
+app.get('/api/verification/status/:userId', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  try {
+    const user = req.user
+    const targetUserId = req.params.userId
+
+    // Only allow users to check their own status unless they're admin
+    if (targetUserId !== user.id && !user.is_admin) {
+      return res.status(403).json({ success: false, error: 'Access denied' })
+    }
+
+    const hasKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    if (!hasKey || DEV_AUTH_BYPASS) {
+      return res.json({ success: true, status: { is_verified: false, verification_timestamp: null, verification_method: null, verification_token_id: null, has_valid_token: false, token_expires_at: null } })
+    }
+    const statusResult = await verificationServiceEnhanced.getUserVerificationStatus(targetUserId)
+    if (!statusResult.success) {
+      return res.status(400).json({ success: false, error: statusResult.error })
+    }
+    res.json({ success: true, status: statusResult.status })
   } catch (error) {
     console.error('Error getting verification status:', error)
     res.status(500).json({ success: false, error: 'Internal server error' })
@@ -527,14 +627,30 @@ app.post('/api/verification/create-token', ipAllowlist, rateLimiter, requireAuth
   }
 
   try {
-    // Use the enhanced service to create verification token via database function
-    const tokenResult = await verificationServiceEnhanced.createVerificationToken({
-      userId: user.id,
-      email,
+    const hasServiceKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    if (!hasServiceKey || DEV_AUTH_BYPASS) {
+      const nowSec = Math.floor(Date.now() / 1000)
+      const expirySec = nowSec + (TOKEN_TTL_SECONDS)
+      const jti = crypto.randomBytes(16).toString('hex')
+      const payload = { sub: user.id, email, type: 'email_verification', iat: nowSec, exp: expirySec, jti }
+      const token = signJwtHS256(payload, VERIFY_SECRET)
+      return res.json({
+        success: true,
+        message: 'Verification token created successfully',
+        token,
+        expires_at: new Date(expirySec * 1000).toISOString(),
+        token_id: null
+      })
+    }
+
+    const tokenResult = await verificationServiceEnhanced.createVerificationToken(
+      user.id,
       type,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    })
+      'email',
+      60,
+      req.ip,
+      req.get('User-Agent')
+    )
 
     if (!tokenResult.success) {
       return res.status(400).json({ success: false, error: tokenResult.error })
@@ -543,9 +659,9 @@ app.post('/api/verification/create-token', ipAllowlist, rateLimiter, requireAuth
     res.json({
       success: true,
       message: 'Verification token created successfully',
-      token: tokenResult.token,
-      expires_at: tokenResult.expires_at,
-      token_id: tokenResult.token_id
+      token: tokenResult.jwtToken,
+      expires_at: tokenResult.expiresAt,
+      token_id: tokenResult.tokenId
     })
   } catch (error) {
     console.error('Error creating verification token:', error)
@@ -562,13 +678,11 @@ app.post('/api/verification/verify-token', ipAllowlist, rateLimiter, verificatio
   }
 
   try {
-    // Use the enhanced service to verify token via database function
-    const verifyResult = await verificationServiceEnhanced.verifyUserToken({
+    const verifyResult = await verificationServiceEnhanced.verifyToken(
       token,
-      type,
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent')
-    })
+      req.ip,
+      req.get('User-Agent')
+    )
 
     if (!verifyResult.success) {
       return res.status(400).json({ success: false, error: verifyResult.error })
@@ -577,9 +691,9 @@ app.post('/api/verification/verify-token', ipAllowlist, rateLimiter, verificatio
     res.json({
       success: true,
       message: 'Verification successful',
-      user_id: verifyResult.user_id,
+      user_id: verifyResult.userId,
       email: verifyResult.email,
-      verified_at: verifyResult.verified_at
+      verified_at: verifyResult.verifiedAt
     })
   } catch (error) {
     console.error('Error verifying token:', error)
@@ -587,39 +701,39 @@ app.post('/api/verification/verify-token', ipAllowlist, rateLimiter, verificatio
   }
 })
 
-// Get enhanced verification status
-app.get('/api/verification/status/:userId?', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+// Get verification errors for current user
+app.get('/api/verification/errors', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
   try {
     const user = req.user
-    const targetUserId = req.params.userId || user.id
+    const targetUserId = user.id
 
-    // Only allow users to check their own status unless they're admin
-    if (targetUserId !== user.id && !user.is_admin) {
-      return res.status(403).json({ success: false, error: 'Access denied' })
-    }
+    const { data, error } = await supabase
+      .from('verification_error_messages')
+      .select('*')
+      .eq('user_id', targetUserId)
+      .order('created_at', { ascending: false })
+      .limit(50)
 
-    // Use the enhanced service to get verification status via database function
-    const statusResult = await verificationServiceEnhanced.getUserVerificationStatus(targetUserId)
-
-    if (!statusResult.success) {
-      return res.status(400).json({ success: false, error: statusResult.error })
+    if (error) {
+      console.error('Error fetching verification errors:', error)
+      return res.status(400).json({ success: false, error: error.message })
     }
 
     res.json({
       success: true,
-      status: statusResult.status
+      errors: data || []
     })
   } catch (error) {
-    console.error('Error getting verification status:', error)
+    console.error('Error getting verification errors:', error)
     res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
 
-// Get verification errors for a user
-app.get('/api/verification/errors/:userId?', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+// Get verification errors for specific user (admin only)
+app.get('/api/verification/errors/:userId', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
   try {
     const user = req.user
-    const targetUserId = req.params.userId || user.id
+    const targetUserId = req.params.userId
 
     // Only allow users to check their own errors unless they're admin
     if (targetUserId !== user.id && !user.is_admin) {
@@ -635,15 +749,15 @@ app.get('/api/verification/errors/:userId?', ipAllowlist, rateLimiter, requireAu
 
     if (error) {
       console.error('Error fetching verification errors:', error)
-      return res.status(500).json({ success: false, error: 'Database error' })
+      return res.status(400).json({ success: false, error: error.message })
     }
 
     res.json({
       success: true,
-      errors: data
+      errors: data || []
     })
   } catch (error) {
-    console.error('Error fetching verification errors:', error)
+    console.error('Error getting verification errors:', error)
     res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -677,6 +791,29 @@ app.post('/api/verification/cleanup', ipAllowlist, rateLimiter, requireAuth, asy
   }
 })
 
+app.post('/api/auth/reauth-link', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
+  try {
+    const user = req.user
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!serviceKey) {
+      return res.status(500).json({ success: false, error: 'Server not configured' })
+    }
+    const admin = createClient(supabaseUrl, serviceKey)
+    const { data, error } = await admin.auth.admin.generateLink({
+      type: 'reauthentication',
+      email: user.email,
+      options: { redirect_to: `${WEBSITE_URL}/verify` }
+    })
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message })
+    }
+    res.json({ success: true, action_link: data?.action_link || null })
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
 // API routes
 app.post('/api/optimize', ipAllowlist, rateLimiter, requireVerified, wrap(optimizeHandler));
 app.post('/api/contact', ipAllowlist, rateLimiter, wrap(contactHandler));
@@ -693,8 +830,10 @@ app.listen(PORT, () => {
   console.log('   GET  /api/verify');
   console.log('   POST /api/verification/create-token');
   console.log('   POST /api/verification/verify-token');
-  console.log('   GET  /api/verification/status/:userId?');
-  console.log('   GET  /api/verification/errors/:userId?');
+  console.log('   GET  /api/verification/status');
+  console.log('   GET  /api/verification/status/:userId');
+  console.log('   GET  /api/verification/errors');
+  console.log('   GET  /api/verification/errors/:userId');
   console.log('   POST /api/verification/cleanup');
 });
 
@@ -702,8 +841,13 @@ app.listen(PORT, () => {
 app.get('/api/verification-metrics', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
   try {
     const stats = await verificationService.getVerificationStats();
-    const emailConfigured = Boolean(process.env.RESEND_API_KEY);
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>';
+    const providerPref = String(process.env.EMAIL_PROVIDER || 'supabase').toLowerCase();
+    const useResend = providerPref === 'resend';
+    const emailConfigured = useResend ? Boolean(process.env.RESEND_API_KEY) : Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const provider = useResend ? 'resend' : 'supabase';
+    const fromEmail = useResend 
+      ? (process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>') 
+      : (process.env.SUPABASE_SMTP_FROM || 'hello@summitpixels.com');
     const rateInfo = { window_ms: RATE_WINDOW_MS, max: RATE_MAX, active_buckets: RATE_BUCKET.size };
     const health = {
       supabaseConfigured: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
@@ -715,7 +859,7 @@ app.get('/api/verification-metrics', ipAllowlist, rateLimiter, requireAuth, asyn
       success: true,
       metrics: {
         stats,
-        email: { provider: 'resend', configured: emailConfigured, from: fromEmail },
+        email: { provider, configured: emailConfigured, from: fromEmail },
         rateLimiter: rateInfo,
         health
       }
@@ -725,4 +869,5 @@ app.get('/api/verification-metrics', ipAllowlist, rateLimiter, requireAuth, asyn
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
+
 

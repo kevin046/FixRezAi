@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Mail, Lock, Eye, EyeOff, Loader2, CheckCircle, Wand2, Clipboard } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { getApiBase } from '@/lib/http'
 import { useAuthStore } from '@/stores/authStore'
 import { validatePassword, generateStrongPassword } from '@/lib/password'
 import { Progress } from './ui/progress'
@@ -24,29 +25,6 @@ function strengthToColors(strength: string) {
   }
 }
 
-function resolveApiBase(): string {
-  try {
-    const envBase = (import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined
-    const winBase = typeof window !== 'undefined' ? (window as any).__VITE_API_BASE_URL as string | undefined : undefined
-    const selectedBase = envBase || winBase
-    if (selectedBase && selectedBase.length > 0) {
-      return selectedBase.replace(/\/$/, '')
-    } else if (typeof window !== 'undefined') {
-      const host = window.location.hostname
-      const isLocal = host === 'localhost' || host === '127.0.0.1'
-      if (isLocal) {
-        // Match running server port if overridden; default 3001
-        const port = (window as any).__API_PORT || 3001
-        return `http://localhost:${port}/api`
-      } else if (host.includes('fixrez.com')) {
-        return 'https://fixrez.com/api'
-      } else {
-        return `${window.location.origin}/api`.replace(/\/$/, '')
-      }
-    }
-  } catch {}
-  return '/api'
-}
 
 export default function RegisterForm({ onToggle }: RegisterFormProps) {
   const [email, setEmail] = useState('')
@@ -103,7 +81,7 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
 
       // Issue CSRF and send verification via backend
       try {
-        const apiBase = resolveApiBase()
+        const apiBase = getApiBase()
         const csrf = await fetch(`${apiBase}/csrf`, { method: 'GET', credentials: 'include' })
         const csrfData = await csrf.json()
         const token = csrfData?.token

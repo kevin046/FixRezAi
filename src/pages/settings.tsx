@@ -23,6 +23,7 @@ import {
   Check,
   X
 } from 'lucide-react'
+import { Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import LogoutButton from '@/components/LogoutButton'
 import { isVerified, resendVerification, canResend, getResendCooldownRemaining } from '@/lib/auth'
@@ -53,7 +54,7 @@ interface SettingItem {
 }
 
 const SettingsPage: React.FC = () => {
-  const { user, verificationStatus } = useAuthStore()
+  const { user, verificationStatus, error: verificationError } = useAuthStore()
   const { theme, toggleTheme, isDark } = useTheme()
   const [searchQuery, setSearchQuery] = useState('')
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -360,6 +361,18 @@ const SettingsPage: React.FC = () => {
                     Welcome, {user.email?.split('@')[0]}
                   </span>
                   <VerificationIndicator size="sm" />
+                  <a
+                    href="/dashboard"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    Dashboard
+                  </a>
+                  <a
+                    href="/settings"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    Settings
+                  </a>
                   <LogoutButton className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" />
                 </>
               ) : (
@@ -449,6 +462,11 @@ const SettingsPage: React.FC = () => {
         </div>
 
         {/* Status Messages */}
+        {!verified && !verificationStatus && (
+          <div className="mb-6 p-4 rounded-lg border bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-300">
+            <div className="text-sm">{verificationError ? `Unable to load verification status: ${verificationError}` : 'Unable to load verification status. Please verify by email or resend below.'}</div>
+          </div>
+        )}
         {status && (
           <div className={`mb-6 p-4 rounded-lg border ${status.type === 'success' 
             ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' 
@@ -467,7 +485,7 @@ const SettingsPage: React.FC = () => {
 
         {/* Security Status Overview */}
         {user && (
-          <div className="mb-8 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div id="security" className="mb-8 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <Shield className="w-5 h-5" />
@@ -725,6 +743,7 @@ const SettingsPage: React.FC = () => {
           </div>
         )}
       </div>
+      
     </div>
   )
 }
