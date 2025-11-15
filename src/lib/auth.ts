@@ -9,8 +9,7 @@ export function isVerified(user: User | null): boolean {
   if (verificationStatus) {
     return Boolean(verificationStatus.verified ?? (verificationStatus as any).is_verified)
   }
-  // If no status yet, default to not verified to avoid false positives
-  return false
+  return !!user?.email_confirmed_at
 }
 
 const RESEND_KEY = 'fixrez_resend_verification_at'
@@ -156,7 +155,14 @@ export async function syncVerifiedMetadata(): Promise<void> {
     } else {
       // Upsert profiles only after successful metadata update to avoid extra writes
       try {
-        await supabase.from('profiles').upsert({ id: user.id, verified: true, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          verified: true,
+          verification_timestamp: new Date().toISOString(),
+          verification_method: 'supabase_email',
+          // Keep last_verification_attempt_at/verification_expires_at from previous send, only mark verified now
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' })
       } catch (e) {
         console.warn('profiles upsert error:', e instanceof Error ? e.message : e)
       }

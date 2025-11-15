@@ -45,9 +45,9 @@ const VerificationIndicator: React.FC<VerificationIndicatorProps> = ({
       // Use verification status from auth store if available
       if (authVerificationStatus) {
         setVerificationStatus({
-          isVerified: authVerificationStatus.verified,
-          verifiedAt: authVerificationStatus.verification_timestamp,
-          verificationMethod: authVerificationStatus.verification_method,
+          isVerified: Boolean(authVerificationStatus.verified || user?.email_confirmed_at),
+          verifiedAt: authVerificationStatus.verification_timestamp || (user?.email_confirmed_at ?? null),
+          verificationMethod: authVerificationStatus.verification_method || (user?.email_confirmed_at ? 'supabase_email' : null),
           hasValidToken: !!authVerificationStatus.verification_token_id,
           tokenExpiresAt: authVerificationStatus.verification_metadata?.expires_at || null
         });
@@ -80,17 +80,10 @@ const VerificationIndicator: React.FC<VerificationIndicatorProps> = ({
     return isNaN(date.getTime()) ? '' : date.toLocaleDateString();
   };
 
-  const sanitizeMethod = (method: string | null) => {
-    if (!method) return '';
-    return method.replace('_', ' ');
-  };
-
   const buildVerifiedTooltip = (vs: VerificationStatus) => {
     const dateText = formatDate(vs.verifiedAt);
-    const methodText = sanitizeMethod(vs.verificationMethod);
     const parts: string[] = [];
     if (dateText) parts.push(`on ${dateText}`);
-    if (methodText) parts.push(`via ${methodText}`);
     return parts.length ? `Email verified ${parts.join(' ')}` : 'Email verified';
   };
 
@@ -341,15 +334,7 @@ const VerificationIndicator: React.FC<VerificationIndicatorProps> = ({
                 </span>
               </div>
             )}
-            
-            {verificationStatus.verificationMethod && (
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Method:</span>
-                <span className="text-gray-900 dark:text-gray-100 capitalize">
-                  {verificationStatus.verificationMethod.replace('_', ' ')}
-                </span>
-              </div>
-            )}
+
             
             {verificationStatus.hasValidToken && (
               <div className="flex justify-between">

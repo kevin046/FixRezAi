@@ -6,9 +6,19 @@
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const VERIFICATION_JWT_SECRET = process.env.VERIFICATION_JWT_SECRET || (process.env.SUPABASE_SERVICE_ROLE_KEY ? crypto.createHash('sha256').update(String(process.env.SUPABASE_SERVICE_ROLE_KEY)).digest('hex') : crypto.randomBytes(32).toString('hex'));
+// Get environment variables at runtime instead of module load time
+function getSupabaseUrl() {
+  return process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co';
+}
+
+function getSupabaseServiceRoleKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY;
+}
+
+function getVerificationJwtSecret() {
+  const serviceKey = getSupabaseServiceRoleKey();
+  return process.env.VERIFICATION_JWT_SECRET || (serviceKey ? crypto.createHash('sha256').update(String(serviceKey)).digest('hex') : crypto.randomBytes(32).toString('hex'));
+}
 const TOKEN_EXPIRY_HOURS = Number(process.env.VERIFICATION_TOKEN_EXPIRY_HOURS || 24);
 
 // Base64 URL encoding for JWT
@@ -52,18 +62,31 @@ class EnhancedVerificationService {
   constructor() {
     this.admin = null;
     this.initialized = false;
+    this.init();
   }
 
   init() {
     if (this.initialized) return;
     
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const serviceKey = getSupabaseServiceRoleKey();
+    const supabaseUrl = getSupabaseUrl();
+    
+    if (!serviceKey) {
+      console.log('EnhancedVerificationService: No SUPABASE_SERVICE_ROLE_KEY found, service will operate in bypass mode');
       this.admin = null;
       this.initialized = true;
       return;
     }
-    this.admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    this.initialized = true;
+    
+    try {
+      this.admin = createClient(supabaseUrl, serviceKey);
+      this.initialized = true;
+      console.log('EnhancedVerificationService: Successfully initialized with Supabase');
+    } catch (error) {
+      console.error('EnhancedVerificationService: Failed to initialize Supabase client:', error);
+      this.admin = null;
+      this.initialized = true;
+    }
   }
 
   /**

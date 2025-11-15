@@ -244,7 +244,7 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
                 {user ? (
                   <>
                     <span className="text-gray-700 dark:text-gray-300">
-                      Welcome, {user.email?.split('@')[0]}
+                      Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
                     </span>
                     <a
                       href="/dashboard"

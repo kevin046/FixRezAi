@@ -19,11 +19,9 @@ export default function AuthPage() {
     } catch { /* no-op */ }
   }, [])
 
-  // If already verified, send to home (App will route to wizard as needed)
+  // App manages navigation for verified users; avoid full-page redirects here
   useEffect(() => {
-    if (user?.email_confirmed_at) {
-      window.location.replace('/')
-    }
+    // no-op: App will handle redirect based on verification status
   }, [user])
 
   return (
@@ -33,7 +31,10 @@ export default function AuthPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => (window.location.href = '/')}
+              onClick={() => {
+                window.history.pushState({}, '', '/')
+                window.dispatchEvent(new PopStateEvent('popstate'))
+              }}
               className="px-3 py-1.5 rounded-md border border-slate-300 dark:border-gray-700 text-slate-700 dark:text-gray-200 hover:bg-slate-100 dark:hover:bg-gray-800"
             >
               ← Back

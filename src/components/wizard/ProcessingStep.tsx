@@ -92,6 +92,8 @@ export function ProcessingStep({
     // Create a new AbortController for this processing session
     processingAbortControllerRef.current = new AbortController()
     
+    let trimmedText = ''
+    
     setHasStarted(true)
     onProcessingStart()
     setError(null)
@@ -119,7 +121,7 @@ export function ProcessingStep({
         throw new Error('No resume content found. Please upload a valid resume file or paste your resume text.')
       }
 
-      const trimmedText = extractedText.trim();
+      trimmedText = extractedText.trim();
       if (trimmedText.length < 50) {
         throw new Error('Resume content is too short. Please provide a more detailed resume.')
       }
@@ -154,13 +156,28 @@ export function ProcessingStep({
           const score = calculateATSScore(validatedResume)
           if (isMountedRef.current) setATSScore(score)
 
-          logOptimization({ id: crypto.randomUUID(), ts: Date.now(), jobTitle, status: 'success', durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) })
+          logOptimization({ 
+            id: crypto.randomUUID(), 
+            ts: Date.now(), 
+            jobTitle, 
+            jobDescription,
+            status: 'success', 
+            durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) 
+          })
           onProcessingComplete(validatedResume);
         } else {
           throw new Error('AI response validation failed. Retrying...');
         }
       } else {
-        logOptimization({ id: crypto.randomUUID(), ts: Date.now(), jobTitle, status: 'error', durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) })
+        logOptimization({ 
+          id: crypto.randomUUID(), 
+          ts: Date.now(), 
+          jobTitle, 
+          jobDescription,
+          status: 'error', 
+          errorMessage: optimizationResult.error || 'Optimization failed',
+          durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) 
+        })
         throw new Error(optimizationResult.error || 'Optimization failed');
       }
     } catch (err) {
@@ -184,7 +201,15 @@ export function ProcessingStep({
         } else {
           setError({ title, message })
           onProcessingError(rawMessage)
-          logOptimization({ id: crypto.randomUUID(), ts: Date.now(), jobTitle, status: 'error', durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) })
+          logOptimization({ 
+            id: crypto.randomUUID(), 
+            ts: Date.now(), 
+            jobTitle, 
+            jobDescription,
+            status: 'error', 
+            errorMessage: rawMessage,
+            durationSec: Math.floor((Date.now() - startTimeRef.current) / 1000) 
+          })
         }
       }
     } finally {

@@ -1,4 +1,5 @@
 import { Hero } from '@/components/Hero'
+import { EnhancedATSRating } from '@/components/EnhancedATSRating'
 import { useAuthStore } from '@/stores/authStore'
 import { useEffect } from 'react'
 
@@ -37,6 +38,26 @@ export default function Home() {
               analyzes your resume against job requirements and provides actionable insights to 
               improve your chances of landing interviews at top companies.
             </p>
+          </div>
+
+          {/* ATS Rating Section */}
+          <div className="mb-16">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                Professional ATS Rating
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+                Upload your resume and get an advanced AI-powered analysis with job-specific scoring. 
+                Compare your resume against actual job descriptions and see detailed breakdowns of keyword matching, 
+                skills alignment, experience relevance, and education requirements.
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
+                Verified users only • Job-specific analysis • Comprehensive scoring • Actionable insights
+              </p>
+            </div>
+            <div className="max-w-4xl mx-auto">
+              <EnhancedATSRating />
+            </div>
           </div>
 
           {/* Key Features Section */}

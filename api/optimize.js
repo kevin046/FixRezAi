@@ -11,6 +11,8 @@ Rules:
 3. Use keywords from the job description
 4. Be concise and professional
 5. Use Canadian spelling
+6. PROFESSIONAL EXPERIENCE: Select 2-3 MOST RELEVANT positions from the user's actual resume that align with the target job. Do NOT create fictional experience. Extract actual companies, dates, and achievements from the resume, then optimize the bullet points with job-relevant keywords and quantifiable results.
+7. EXPERIENCE CALCULATION: Calculate total years of experience from the ACTUAL employment dates in the resume. Sum up all relevant work experience and reflect this accurately in the professional summary.
 
 JSON format:
 {
@@ -18,7 +20,7 @@ JSON format:
   "summary": "2-3 sentence summary with job keywords",
   "experience": [{"company": "Name", "location": "City, Province", "dates": "MMM YYYY - MMM YYYY", "title": "Title", "bullets": ["achievement with keywords"]}],
   "education": [{"school": "Name", "location": "City, Province", "dates": "Year - Year", "degree": "Degree"}],
-  "additional": {"technical_skills": "skills", "languages": "languages", "certifications": "certs"}
+  "additional": {"technical_skills": "core competencies and professional skills relevant to the role, focusing on methodologies, analytical skills, and industry expertise rather than specific software tools unless mentioned in job description", "languages": "languages", "certifications": "certs"}
 }`;
 
 const MODEL_FALLBACKS = [process.env.OPENROUTER_MODEL || 'meta-llama/llama-4-maverick:free'];

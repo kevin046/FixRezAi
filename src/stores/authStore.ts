@@ -32,6 +32,9 @@ interface AuthState {
   isLoading: boolean
   error: string | null
   hydrated: boolean
+  verificationLoaded: boolean
+  lastVerificationFetchAt?: number
+  verificationBackoffUntil?: number
   
   // Actions
   setUser: (user: User | null) => void
@@ -54,6 +57,9 @@ export const useAuthStore = create<AuthState>()(
       isLoading: false,
       error: null,
       hydrated: false,
+      verificationLoaded: false,
+      lastVerificationFetchAt: undefined,
+      verificationBackoffUntil: undefined,
       
       setUser: (user) => set({ user, isAuthenticated: !!user }),
       
@@ -67,14 +73,39 @@ export const useAuthStore = create<AuthState>()(
           set({ error: 'No user ID provided' })
           return
         }
+        const now = Date.now()
+        const last = get().lastVerificationFetchAt || 0
+        const backoffUntil = get().verificationBackoffUntil || 0
+        if (now < backoffUntil) {
+          return
+        }
+        if (get().isLoading || (now - last) < 10000) {
+          return
+        }
         
         set({ isLoading: true, error: null })
+        
+        let profileVerified = false
+        let profileTimestamp: string | null = null
+        let profileMethod: string | null = null
         
         try {
           const { data: { session } } = await supabase.auth.getSession()
           if (!session?.access_token) {
             throw new Error('No authentication session found')
           }
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('verified, verification_timestamp, verification_method')
+              .eq('id', session.user.id)
+              .single()
+            if (profile) {
+              profileVerified = Boolean((profile as any).verified)
+              profileTimestamp = (profile as any).verification_timestamp || null
+              profileMethod = (profile as any).verification_method || null
+            }
+          } catch {}
           
           // Use the current-user verification status endpoint
           const apiBase = getApiBase()
@@ -94,12 +125,41 @@ export const useAuthStore = create<AuthState>()(
             set({ error: text || 'Invalid response type from verification status endpoint' })
             return
           }
-          if (response.ok && result?.success) {
+          if (response.status === 429) {
+            const retryAfterHeader = response.headers.get('Retry-After')
+            const retrySeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 15
+            const retryMs = Math.max(10000, (retrySeconds || 15) * 1000)
+            set({ verificationBackoffUntil: Date.now() + retryMs })
+            // Fallback to Supabase user state and profile
+            const { data: { user: fresh } } = await supabase.auth.getUser()
+            if (fresh || profileVerified) {
+              set({ verificationStatus: {
+                verified: Boolean(profileVerified || fresh?.email_confirmed_at),
+                verification_timestamp: (profileTimestamp ?? (fresh?.email_confirmed_at ?? null)),
+                verification_method: (profileMethod ?? (fresh?.email_confirmed_at ? 'supabase_email' : null)),
+                verification_token_id: null,
+                verification_metadata: null,
+                has_valid_token: false,
+                token_expires_at: null
+              } })
+            }
+          } else if (response.ok && result?.success) {
             const s = result.status || {}
+            let isVerified = Boolean(s.is_verified ?? s.verified ?? false)
+            if (!isVerified && profileVerified) {
+              isVerified = true
+            }
+            
+            // If API says not verified but user has email_confirmed_at in Supabase, trust Supabase
+            if (!isVerified && session?.user?.email_confirmed_at) {
+              console.log('API reports unverified but Supabase user has email_confirmed_at, using Supabase verification')
+              isVerified = true
+            }
+            
             set({ verificationStatus: {
-              verified: Boolean(s.is_verified ?? s.verified ?? false),
-              verification_timestamp: s.verification_timestamp ?? null,
-              verification_method: s.verification_method ?? null,
+              verified: isVerified,
+              verification_timestamp: (s.verification_timestamp ?? profileTimestamp ?? (session?.user?.email_confirmed_at || null)),
+              verification_method: (s.verification_method ?? profileMethod ?? (session?.user?.email_confirmed_at ? 'supabase_email' : null)),
               verification_token_id: s.verification_token_id ?? null,
               verification_metadata: null,
               has_valid_token: Boolean(s.has_valid_token ?? false),
@@ -107,13 +167,39 @@ export const useAuthStore = create<AuthState>()(
             } })
           } else {
             const msg = (result?.error || response.statusText || 'Failed to fetch verification status')
+            // Fallback to Supabase user state when API is unavailable
+            try {
+              const { data: { user: fresh } } = await supabase.auth.getUser()
+              if (fresh) {
+                set({ verificationStatus: {
+                  verified: Boolean(profileVerified || fresh.email_confirmed_at),
+                  verification_timestamp: (profileTimestamp ?? (fresh.email_confirmed_at ?? null)),
+                  verification_method: (profileMethod ?? (fresh.email_confirmed_at ? 'supabase_email' : null)),
+                  verification_token_id: null,
+                  verification_metadata: null
+                } })
+              }
+            } catch {}
             set({ error: msg })
           }
         } catch (error: any) {
           console.error('Failed to fetch verification status:', error)
+          // Fallback to Supabase user state when network/API is down
+          try {
+            const { data: { user: fresh } } = await supabase.auth.getUser()
+            if (fresh) {
+              set({ verificationStatus: {
+                verified: Boolean(profileVerified || fresh.email_confirmed_at),
+                verification_timestamp: (profileTimestamp ?? (fresh.email_confirmed_at ?? null)),
+                verification_method: (profileMethod ?? (fresh.email_confirmed_at ? 'supabase_email' : null)),
+                verification_token_id: null,
+                verification_metadata: null
+              } })
+            }
+          } catch {}
           set({ error: error.message })
         } finally {
-          set({ isLoading: false })
+          set({ isLoading: false, verificationLoaded: true, lastVerificationFetchAt: Date.now() })
         }
       },
       
@@ -262,7 +348,7 @@ export const useAuthStore = create<AuthState>()(
       
       logout: async () => {
         await supabase.auth.signOut()
-        set({ user: null, isAuthenticated: false, verificationStatus: null })
+        set({ user: null, isAuthenticated: false, verificationStatus: null, verificationLoaded: false })
       },
       
       clearError: () => set({ error: null })
@@ -274,7 +360,8 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         verificationStatus: state.verificationStatus,
-        hydrated: state.hydrated
+        hydrated: state.hydrated,
+        verificationLoaded: state.verificationLoaded
       })
     }
   )

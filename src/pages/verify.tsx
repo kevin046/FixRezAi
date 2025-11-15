@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { isVerified, resendVerification, secureLogout, syncVerifiedMetadata, canResend, getResendCooldownRemaining } from '@/lib/auth'
-import { ArrowLeft } from 'lucide-react'
+
 import { supabase } from '@/lib/supabase'
 import { getApiBase } from '@/lib/http'
 
 export default function VerifyPage() {
-  const { user } = useAuthStore()
+  const { user, verificationStatus, fetchVerificationStatus } = useAuthStore()
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [cooldownMs, setCooldownMs] = useState<number>(getResendCooldownRemaining())
@@ -49,8 +49,8 @@ export default function VerifyPage() {
           if (fresh && isVerified(fresh)) {
             // Persist a metadata flag to simplify downstream checks
             await syncVerifiedMetadata()
-            setStatus({ type: 'success', message: 'Email verified successfully. Redirecting…' })
-            setTimeout(() => { window.location.replace('/') }, 800)
+            setStatus({ type: 'success', message: 'Email verified successfully.' })
+            setTimeout(() => { window.location.replace('/verified') }, 800)
           }
           // Clean the hash from the URL
           const cleanUrl = window.location.pathname + window.location.search
@@ -65,8 +65,8 @@ export default function VerifyPage() {
           const { data: { user: fresh } } = await supabase.auth.getUser()
           if (fresh && isVerified(fresh)) {
             await syncVerifiedMetadata()
-            setStatus({ type: 'success', message: 'Email verified successfully. Redirecting…' })
-            setTimeout(() => { window.location.replace('/') }, 800)
+            setStatus({ type: 'success', message: 'Email verified successfully.' })
+            setTimeout(() => { window.location.replace('/verified') }, 800)
           }
           // Clean the hash from the URL
           const cleanUrl = window.location.pathname + window.location.search
@@ -76,21 +76,24 @@ export default function VerifyPage() {
     } catch { /* no-op */ }
   }, [])
 
-  // If user is verified, do not show verify page
   useEffect(() => {
-    if (user && isVerified(user)) {
-      window.location.replace('/')
+    if (user) {
+      fetchVerificationStatus(user.id).catch(() => {})
     }
   }, [user])
 
-  const handleBack = () => {
-    if (window.history.length > 1) {
-      window.history.back()
-    } else {
-      window.history.pushState({}, '', '/')
-      window.dispatchEvent(new PopStateEvent('popstate'))
+  // If user is verified, do not show verify page
+  useEffect(() => {
+    if (user && isVerified(user)) {
+      window.location.replace('/verified')
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (verificationStatus?.verified) {
+      window.location.replace('/verified')
+    }
+  }, [verificationStatus])
 
   const handleResend = async () => {
     if (!email) {
@@ -136,14 +139,7 @@ export default function VerifyPage() {
       {/* Top nav bar */}
       <nav className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleBack}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <ArrowLeft className="w-4 h-4" /> Back
-            </button>
-          </div>
+          <div className="flex items-center gap-2"></div>
           <div className="flex items-center gap-2 text-sm">
             <a
               href="/"
@@ -163,23 +159,20 @@ export default function VerifyPage() {
 
       {/* Content */}
       <div className="container mx-auto max-w-2xl px-4 py-10">
-        {/* Explicit Not Verified banner */}
         {!status && (
-          <div className="mb-4 rounded-lg border px-4 py-3 border-red-300 bg-red-50 text-red-700">
-            {email ? (
-              <span>Your email ({email}) is not verified. Please click the link sent to your inbox or resend the verification email below.</span>
-            ) : (
-              <span>Your email is not verified. Please sign in and resend the verification email.</span>
-            )}
+          <div className="mb-4 rounded-lg border px-4 py-3 border-blue-300 bg-blue-50 text-blue-700">
+            <span>
+              Thanks for signing up. We sent a confirmation to <span className="font-medium">{email || 'your email'}</span> from <span className="font-medium">noreply@summitpixels.com</span>.
+              The link is valid for 24 hours. It may take up to 2 minutes for the email to arrive. If you don't see it, check your Spam/Junk folder.
+            </span>
           </div>
         )}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Verify your email</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Confirm your email to activate your account</h1>
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            To use FixRez AI, please verify your email by clicking the link sent to{' '}
-            <span className="font-medium">{email || 'your inbox'}</span>.
+            Open the email from <span className="font-medium">noreply@summitpixels.com</span> and click the verification button to finish setting up your account.
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Secure verification protects your account and enables access to all features.</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">This protects your account and enables access to all features.</p>
 
           {status && (
             <div className={`mb-4 rounded-lg border px-4 py-3 ${status.type === 'success' ? 'border-green-300 bg-green-50 text-green-700' : 'border-red-300 bg-red-50 text-red-700'}`}>
@@ -195,35 +188,20 @@ export default function VerifyPage() {
             >
               {resendLabel}
             </button>
+            {resendDisabled && (
+              <div className="text-xs text-gray-500 dark:text-gray-400">Next resend available in {cooldownSeconds}s</div>
+            )}
             
             
             <button
               onClick={handleGoToLogin}
-              className="w-full py-2 rounded-xl text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-full py-2 rounded-xl text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
             >
-              Go to Sign In
+              Already verified? Go to login
             </button>
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="py-10 border-t border-gray-200 dark:border-gray-700">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">© 2025 Summit Pixels Inc.</p>
-            <div className="flex items-center gap-6 text-sm">
-              <a href="/terms" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Terms</a>
-              <a href="/privacy" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Privacy</a>
-              <a href="/contact" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Contact</a>
-              <a href="/accessibility" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Accessibility</a>
-              <a href="/settings#security" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Security</a>
-              <span className="text-gray-400">•</span>
-              <span className="text-gray-600 dark:text-gray-300">Powered by Summit Pixels Inc.</span>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

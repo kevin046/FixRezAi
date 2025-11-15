@@ -15,7 +15,7 @@ import googleLogo from "@/assets/logos/google.svg";
 import anthropicLogo from "@/assets/logos/anthropic.svg";
 import microsoftLogo from "@/assets/logos/microsoft.svg";
 import LogoutButton from '@/components/LogoutButton'
-import { ATSRating } from '@/components/ATSRating';
+
 import { OptimizedResume } from '@/types/resume';
 
 const logos = [
@@ -51,7 +51,7 @@ interface HeroProps {
 export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
   const [resumesProcessed, setResumesProcessed] = useState(0)
   const [logoutStatus, setLogoutStatus] = useState<'success' | 'error' | null>(null)
-  const [showATSRating, setShowATSRating] = useState(false);
+
   const optimizedResume = useResumeStore((s) => s.optimizedResume)
   const verified = user ? isVerified(user) : false
 
@@ -131,10 +131,10 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
               {user ? (
                 <>
                   <span className="text-gray-700 dark:text-gray-300">
-                    Welcome, {user.email?.split('@')[0]}
+                    Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
                   </span>
-                  {/* Verification badge */}
-                  <VerificationIndicator size="sm" />
+
+
                   <a
                     href="/dashboard"
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
@@ -205,7 +205,7 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
             </button>
             {user && (
               <button 
-                onClick={() => setShowATSRating(true)}
+                onClick={() => window.location.href = '/ats-rating'}
                 className="w-full sm:w-auto px-6 py-3 text-sm font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-full hover:bg-blue-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center justify-center"
               >
                 ATS Rating
@@ -213,26 +213,6 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
               </button>
             )}
           </div>
-          
-          {/* ATS Rating Modal */}
-          {showATSRating && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">ATS Rating</h2>
-                    <button
-                      onClick={() => setShowATSRating(false)}
-                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <ATSRating resume={optimizedResume} />
-                </div>
-              </div>
-            </div>
-          )}
           
           {/* Live Counter */}
           <div className="text-center mb-16">
@@ -338,12 +318,3 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-

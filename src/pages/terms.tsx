@@ -1,19 +1,13 @@
-
 import React from "react";
 import { useAuthStore } from '@/stores/authStore'
-import { ArrowLeft, Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
+import { Home, LayoutDashboard, Settings, Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
 import LogoutButton from '@/components/LogoutButton'
+import VerificationIndicator from '@/components/VerificationIndicator'
+import { isVerified } from '@/lib/auth'
 
 const TermsAndConditions: React.FC = () => {
   const { user } = useAuthStore()
-  const handleBack = () => {
-    if (window.history.length > 1) {
-      window.history.back()
-    } else {
-      window.history.pushState({}, '', '/')
-      window.dispatchEvent(new PopStateEvent('popstate'))
-    }
-  }
+  const verified = user ? isVerified(user) : false
 
   return (
     <div className="bg-gray-100 min-h-screen">
@@ -22,13 +16,6 @@ const TermsAndConditions: React.FC = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleBack}
-                aria-label="Go back"
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center gap-1"
-              >
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
               <a href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 FixRez AI
               </a>
@@ -37,12 +24,28 @@ const TermsAndConditions: React.FC = () => {
               {user ? (
                 <>
                   <span className="text-gray-700 dark:text-gray-300">
-                    Welcome, {user.email?.split('@')[0]}
+                    Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
                   </span>
+                  {verified && <VerificationIndicator />}
+                  <a
+                    href="/"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    <Home className="w-4 h-4 inline mr-1" />
+                    Home
+                  </a>
+                  <a
+                    href="/dashboard"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                  >
+                    <LayoutDashboard className="w-4 h-4 inline mr-1" />
+                    Dashboard
+                  </a>
                   <a
                     href="/settings"
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   >
+                    <Settings className="w-4 h-4 inline mr-1" />
                     Settings
                   </a>
                   <LogoutButton className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" />
@@ -128,7 +131,6 @@ const TermsAndConditions: React.FC = () => {
           </p>
         </div>
       </div>
-      
     </div>
   );
 };

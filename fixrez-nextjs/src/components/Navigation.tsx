@@ -91,8 +91,8 @@ export default function Navigation() {
                   Settings
                 </Link>
                 
-                {/* Verification Status */}
-                {!session.user.verified && <VerificationIndicator />}
+
+
                 
                 {/* User Menu */}
                 <div className="relative group">

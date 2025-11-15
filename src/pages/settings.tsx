@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { 
-  ArrowLeft, 
+  Home, 
   CheckCircle, 
   XCircle, 
   Clock, 
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/lib/supabase'
 import LogoutButton from '@/components/LogoutButton'
 import { isVerified, resendVerification, canResend, getResendCooldownRemaining } from '@/lib/auth'
 import VerificationIndicator from '@/components/VerificationIndicator'
@@ -54,7 +55,7 @@ interface SettingItem {
 }
 
 const SettingsPage: React.FC = () => {
-  const { user, verificationStatus, error: verificationError } = useAuthStore()
+  const { user, verificationStatus, error: verificationError, setVerificationStatus } = useAuthStore()
   const { theme, toggleTheme, isDark } = useTheme()
   const [searchQuery, setSearchQuery] = useState('')
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -343,13 +344,6 @@ const SettingsPage: React.FC = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleBack}
-                aria-label="Go back"
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center gap-1"
-              >
-                <ArrowLeft className="w-4 h-4" /> Back
-              </button>
               <a href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 FixRez AI
               </a>
@@ -358,9 +352,15 @@ const SettingsPage: React.FC = () => {
               {user ? (
                 <>
                   <span className="text-gray-700 dark:text-gray-300 text-sm">
-                    Welcome, {user.email?.split('@')[0]}
+                    Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
                   </span>
                   <VerificationIndicator size="sm" />
+                  <a
+                    href="/"
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center gap-1"
+                  >
+                    <Home className="w-4 h-4" /> Home
+                  </a>
                   <a
                     href="/dashboard"
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
@@ -408,24 +408,19 @@ const SettingsPage: React.FC = () => {
               <button
                 onClick={handleResendVerification}
                 disabled={resendDisabled}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
-                aria-label="Resend verification email"
+                className={`w-full px-4 py-2 rounded-lg font-medium transition-colors ${
+                  resendDisabled
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
               >
-                {resendingEmail ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  resendLabel
-                )}
+                {resendingEmail ? 'Sending...' : resendLabel}
               </button>
               <button
                 onClick={() => setShowVerificationOverlay(false)}
-                className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 font-medium py-2 px-4 rounded-lg"
-                aria-label="Close verification overlay"
+                className="w-full px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
-                Close
+                Dismiss
               </button>
             </div>
           </div>
@@ -433,317 +428,203 @@ const SettingsPage: React.FC = () => {
       )}
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Page Header */}
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Settings</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage your account preferences and application settings</p>
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-8">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search settings..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Status Messages */}
-        {!verified && !verificationStatus && (
-          <div className="mb-6 p-4 rounded-lg border bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-300">
-            <div className="text-sm">{verificationError ? `Unable to load verification status: ${verificationError}` : 'Unable to load verification status. Please verify by email or resend below.'}</div>
-          </div>
-        )}
-        {status && (
-          <div className={`mb-6 p-4 rounded-lg border ${status.type === 'success' 
-            ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' 
-            : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300'
-          }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+              <p className="text-gray-600 dark:text-gray-300">Manage your account preferences and application settings</p>
+            </div>
             <div className="flex items-center gap-2">
-              {status.type === 'success' ? (
-                <Check className="w-5 h-5" />
-              ) : (
-                <X className="w-5 h-5" />
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search settings..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              {status && (
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+                  status.type === 'success' 
+                    ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' 
+                    : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                }`}>
+                  {status.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                  {status.message}
+                </div>
               )}
-              <span className="font-medium">{status.message}</span>
             </div>
           </div>
-        )}
 
-        {/* Security Status Overview */}
-        {user && (
-          <div id="security" className="mb-8 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                Account Security
-              </h2>
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                securityStatus.color === 'green' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' :
-                securityStatus.color === 'yellow' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300' :
-                'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'
-              }`}>
-                {securityStatus.level === 'high' ? 'High' : securityStatus.level === 'medium' ? 'Medium' : 'Low'}
+          {/* Security Status Overview */}
+          <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className={`w-5 h-5 text-${securityStatus.color}-600 dark:text-${securityStatus.color}-400`} />
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Security Status</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{securityStatus.message}</p>
+                </div>
               </div>
+              <button
+                onClick={() => setShowSecurityDetails(!showSecurityDetails)}
+                className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              >
+                {showSecurityDetails ? 'Hide Details' : 'View Details'}
+              </button>
             </div>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">{securityStatus.message}</p>
-            
+
+            {/* Detailed Security Information */}
             {showSecurityDetails && (
-              <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Email Verification</span>
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center gap-2">
-                    {verified ? (
-                      <>
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span className="text-green-600 dark:text-green-400">Verified</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                        <span className="text-yellow-600 dark:text-yellow-400">Not Verified</span>
-                      </>
-                    )}
+                    {verified ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
+                    <span className={verified ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                      Email Verification: {verified ? 'Verified' : 'Not Verified'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span className="text-green-600 dark:text-green-400">Account Status: Active</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    <span className="text-blue-600 dark:text-blue-400">
+                      Member Since: {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-600" />
+                    <span className="text-gray-600 dark:text-gray-400">Email: {email || 'Not provided'}</span>
                   </div>
                 </div>
-                
-                {verificationStatus && (
-                  <>
-                    {verificationStatus.verification_timestamp && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Verified On</span>
-                        <span className="text-gray-900 dark:text-gray-100">
-                          {new Date(verificationStatus.verification_timestamp).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {verificationStatus.has_valid_token && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Token Status</span>
-                        <span className="text-blue-600 dark:text-blue-400">Valid until {new Date(verificationStatus.token_expires_at).toLocaleString()}</span>
-                      </div>
-                    )}
-                  </>
-                )}
               </div>
             )}
           </div>
-        )}
+        </div>
 
         {/* Settings Categories */}
-        {filteredCategories.length === 0 ? (
-          <div className="text-center py-12">
-            <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No settings found</h3>
-            <p className="text-gray-600 dark:text-gray-400">Try adjusting your search query or browse all settings.</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {filteredCategories.map((category) => (
-              <div key={category.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="p-6 border-b border-gray-200 dark:border-gray-600">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                        {category.icon}
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{category.title}</h2>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm">{category.description}</p>
-                      </div>
+        <div className="space-y-6">
+          {filteredCategories.map((category) => (
+            <div key={category.id} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="p-6 border-b border-gray-200 dark:border-gray-600">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                      {category.icon}
                     </div>
-                    <button
-                      onClick={() => restoreDefaults(category.id)}
-                      className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      aria-label={`Restore ${category.title} defaults`}
-                    >
-                      Restore Defaults
-                    </button>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{category.title}</h2>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">{category.description}</p>
+                    </div>
                   </div>
+                  <button
+                    onClick={() => restoreDefaults(category.id)}
+                    className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Restore Defaults
+                  </button>
                 </div>
-                
-                <div className="divide-y divide-gray-200 dark:divide-gray-600">
-                  {category.settings.map((setting) => (
-                    <div key={setting.id} className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
+              </div>
+              <div className="divide-y divide-gray-200 dark:divide-gray-600">
+                {category.settings.map((setting) => (
+                  <div key={setting.id} className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">{setting.title}</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{setting.description}</p>
+                        {setting.tooltip && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{setting.tooltip}</p>
+                        )}
+                      </div>
+                      <div className="ml-4">
+                        {setting.type === 'toggle' && (
+                          <button
+                            onClick={() => setting.onChange && setting.onChange(!setting.value)}
+                            disabled={setting.disabled}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              setting.value
+                                ? 'bg-blue-600'
+                                : 'bg-gray-200 dark:bg-gray-700'
+                            } ${
+                              setting.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                setting.value ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        )}
+                        {setting.type === 'button' && (
+                          <button
+                            onClick={setting.onClick}
+                            disabled={setting.disabled}
+                            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              setting.dangerous
+                                ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 border border-red-300 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                : 'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                            } ${
+                              setting.disabled ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                          >
+                            {setting.title}
+                          </button>
+                        )}
+                        {setting.type === 'info' && (
                           <div className="flex items-center gap-2">
-                            <h3 className="text-base font-medium text-gray-900 dark:text-white">{setting.title}</h3>
-                            {setting.tooltip && (
-                              <div className="group relative">
-                                <HelpCircle className="w-4 h-4 text-gray-400 cursor-help" />
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-10">
-                                  {setting.tooltip}
-                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                                    <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                                  </div>
-                                </div>
-                              </div>
+                            {setting.value === 'verified' ? (
+                              <CheckCircle className="w-5 h-5 text-green-600" />
+                            ) : setting.value === 'unverified' ? (
+                              <XCircle className="w-5 h-5 text-red-600" />
+                            ) : (
+                              <Info className="w-5 h-5 text-gray-400" />
                             )}
+                            <span className="text-sm text-gray-600 dark:text-gray-300 capitalize">
+                              {setting.value}
+                            </span>
                           </div>
-                          <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{setting.description}</p>
-                          
-                          {setting.type === 'info' && setting.value && (
-                            <div className="mt-3">
-                              {setting.id === 'email-verification' && (
-                                <div className="flex items-center gap-2">
-                                  {setting.value === 'verified' ? (
-                                    <>
-                                      <CheckCircle className="w-5 h-5 text-green-500" />
-                                      <span className="text-green-600 dark:text-green-400 font-medium">Email Verified</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <XCircle className="w-5 h-5 text-red-500" />
-                                      <span className="text-red-600 dark:text-red-400 font-medium">Email Not Verified</span>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="ml-4">
-                          {setting.type === 'toggle' && (
-                            <button
-                              onClick={() => setting.onChange?.(!setting.value)}
-                              disabled={setting.disabled}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                                setting.value ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-                              } ${setting.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                              role="switch"
-                              aria-checked={setting.value}
-                            >
-                              <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                  setting.value ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                              />
-                            </button>
-                          )}
-                          
-                          {setting.type === 'button' && (
-                            <button
-                              onClick={setting.onClick}
-                              disabled={setting.disabled}
-                              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                                setting.dangerous
-                                  ? 'text-red-700 bg-red-100 hover:bg-red-200 dark:text-red-300 dark:bg-red-900/20 dark:hover:bg-red-900/30 focus:ring-red-500'
-                                  : 'text-blue-700 bg-blue-100 hover:bg-blue-200 dark:text-blue-300 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 focus:ring-blue-500'
-                              } ${setting.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                            >
-                              {setting.id === 'resend-verification' && resendingEmail ? (
-                                <div className="flex items-center gap-2">
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                  Sending...
-                                </div>
-                              ) : (
-                                setting.id === 'resend-verification' ? resendLabel :
-                                setting.id === 'security-status' ? (showSecurityDetails ? 'Hide Details' : 'Show Details') :
-                                setting.title
-                              )}
-                            </button>
-                          )}
-                          
-                          {setting.type === 'select' && setting.options && (
-                            <select
-                              value={setting.value}
-                              onChange={(e) => setting.onChange?.(e.target.value)}
-                              disabled={setting.disabled}
-                              className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              {setting.options.map(option => (
-                                <option key={option} value={option}>{option}</option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
 
-        {/* Quick Actions */}
-        {user && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <button
-              onClick={handleResendVerification}
-              disabled={resendDisabled || verified}
-              className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <div className="text-left">
-                  <div className="font-medium text-gray-900 dark:text-white">Resend Verification</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {verified ? 'Already verified' : resendLabel}
-                  </div>
-                </div>
-              </div>
-            </button>
-            
-            <button
-               onClick={toggleTheme}
-               className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-             >
-              <div className="flex items-center gap-3">
-                {theme === 'dark' ? (
-                  <Sun className="w-5 h-5 text-yellow-600" />
-                ) : (
-                  <Moon className="w-5 h-5 text-gray-600" />
-                )}
-                <div className="text-left">
-                  <div className="font-medium text-gray-900 dark:text-white">Toggle Theme</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Switch to {theme === 'dark' ? 'light' : 'dark'} mode
-                  </div>
-                </div>
-              </div>
-            </button>
-            
-            <button
-              onClick={() => {
-                if (confirm('Are you sure you want to log out?')) {
-                  // Trigger logout through LogoutButton component
-                  const logoutButton = document.querySelector('[data-logout-button]')
-                  if (logoutButton instanceof HTMLButtonElement) {
-                    logoutButton.click()
-                  }
-                }
-              }}
-              className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-5 h-5 text-red-600">🚪</div>
-                <div className="text-left">
-                  <div className="font-medium text-gray-900 dark:text-white">Sign Out</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Log out of your account</div>
-                </div>
-              </div>
-            </button>
+        {/* Footer */}
+        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Need Help?</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">Contact support for assistance with your account</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href="/contact"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                Contact Support
+              </a>
+              <a
+                href="/help"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                Help Center
+              </a>
+            </div>
           </div>
-        )}
+
+
+        </div>
       </div>
-      
     </div>
   )
 }

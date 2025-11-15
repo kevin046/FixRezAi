@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Download, FileText, Code, CheckCircle, AlertCircle, FileImage } from 'lucide-react'
-import { exportAsText, exportAsJSON, exportLinkedInSummary, trackExport } from '../../lib/exportUtils'
-import { logExport } from '@/lib/analytics'
+import { exportAsText, exportAsJSON, exportLinkedInSummary } from '../../lib/exportUtils'
+
 import { pdf } from '@react-pdf/renderer'
 import { ResumeTemplatePDF } from '../ResumeTemplatePDF'
 import type { OptimizedResume } from '../../types/resume'
@@ -33,14 +33,12 @@ export function ExportStep({ optimizedResume }: ExportStepProps) {
     try {
       switch (format) {
         case 'text':
-          await exportAsText(optimizedResume, filename)
-          trackExport('text', template)
-          logExport({ id: crypto.randomUUID(), ts: Date.now(), format: 'text', template })
+          await exportAsText(optimizedResume, filename, template)
+
           break
         case 'json':
-          await exportAsJSON(optimizedResume, filename)
-          trackExport('json', template)
-          logExport({ id: crypto.randomUUID(), ts: Date.now(), format: 'json', template })
+          await exportAsJSON(optimizedResume, filename, template)
+
           break
         case 'pdf':
           try {
@@ -59,17 +57,15 @@ export function ExportStep({ optimizedResume }: ExportStepProps) {
             link.click()
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
-            trackExport('pdf', template)
-            logExport({ id: crypto.randomUUID(), ts: Date.now(), format: 'pdf', template })
+
           } catch (pdfError) {
             console.error('PDF Export Error:', pdfError)
             throw new Error(`PDF export failed: ${pdfError instanceof Error ? pdfError.message : String(pdfError)}`)
           }
           break
         case 'linkedin':
-          await exportLinkedInSummary(optimizedResume, filename)
-          trackExport('linkedin', template)
-          logExport({ id: crypto.randomUUID(), ts: Date.now(), format: 'linkedin', template })
+          await exportLinkedInSummary(optimizedResume, filename, template)
+
           break
       }
 

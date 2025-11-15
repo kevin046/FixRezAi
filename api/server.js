@@ -11,6 +11,7 @@ import crypto from 'crypto'
 import VerificationService from './services/verificationService.js';
 import VerificationServiceEnhanced from './services/verificationServiceEnhanced.js';
 import verificationMiddleware from './middleware/verification.js';
+import { analyzeATS, getAnalysisProgress, getAnalysisResults, cleanupSession } from './atsRoutes.js';
 
 // Import serverless-style handlers and adapt to Express
 import optimizeHandler, { AI_STATUS } from './optimize.js';
@@ -25,7 +26,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http:
 
 // Dev bypass flag
 const DEV_AUTH_BYPASS = false;
-console.log('🔧 DEV_AUTH_BYPASS:', 'disabled')
+console.log('🔧 DEV_AUTH_BYPASS:', DEV_AUTH_BYPASS ? 'enabled' : 'disabled')
 
 const corsOptions = {
   origin: function(origin, callback) {
@@ -524,7 +525,18 @@ app.get('/api/verify', ipAllowlist, rateLimiter, verificationMiddleware.logVerif
         if (sig !== expected) throw new Error('Invalid signature')
         const payload = JSON.parse(Buffer.from(p2.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'))
         const nowSec = Math.floor(Date.now() / 1000)
-        if (typeof payload.exp === 'number' && nowSec > payload.exp) throw new Error('Token expired')
+        if (typeof payload.exp === 'number' && nowSec > payload.exp) {
+          const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
+          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+          if (serviceKey) {
+            const admin = createClient(supabaseUrl, serviceKey)
+            const { error: resendErr } = await admin.auth.resend({ type: 'signup', email: payload.email, options: { emailRedirectTo: `${WEBSITE_URL}/verify` } })
+          }
+          const urlFail = new URL(FAILURE_REDIRECT_URL)
+          urlFail.searchParams.set('error', 'expired')
+          urlFail.searchParams.set('resent', '1')
+          return res.redirect(urlFail.toString())
+        }
         const url = new URL(SUCCESS_REDIRECT_URL)
         url.searchParams.set('user_id', payload.sub || '')
         return res.redirect(url.toString())
@@ -542,8 +554,18 @@ app.get('/api/verify', ipAllowlist, rateLimiter, verificationMiddleware.logVerif
     )
 
     if (!verifyResult.success) {
+      const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (serviceKey) {
+        const decoded = (() => { try { return JSON.parse(Buffer.from(String(token).split('.')[1].replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8')) } catch { return null } })()
+        if (decoded && decoded.email) {
+          const admin = createClient(supabaseUrl, serviceKey)
+          await admin.auth.resend({ type: 'signup', email: decoded.email, options: { emailRedirectTo: `${WEBSITE_URL}/verify` } })
+        }
+      }
       const url = new URL(FAILURE_REDIRECT_URL)
       url.searchParams.set('error', verifyResult.error || 'invalid')
+      url.searchParams.set('resent', '1')
       return res.redirect(url.toString())
     }
 
@@ -562,7 +584,19 @@ app.get('/api/verification/status', ipAllowlist, rateLimiter, requireAuth, verif
     const user = req.user
     const hasKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
     if (!hasKey || DEV_AUTH_BYPASS) {
-      return res.json({ success: true, status: { is_verified: false, verification_timestamp: null, verification_method: null, verification_token_id: null, has_valid_token: false, token_expires_at: null } })
+      // In dev mode or when service key is missing, use basic Supabase verification
+      const isVerified = Boolean(user.email_confirmed_at);
+      return res.json({ 
+        success: true, 
+        status: { 
+          is_verified: isVerified, 
+          verification_timestamp: user.email_confirmed_at || null, 
+          verification_method: isVerified ? 'supabase_email' : null, 
+          verification_token_id: null, 
+          has_valid_token: isVerified, 
+          token_expires_at: null 
+        } 
+      })
     }
     const statusResult = await verificationServiceEnhanced.getUserVerificationStatus(user.id)
     if (!statusResult.success) {
@@ -588,7 +622,19 @@ app.get('/api/verification/status/:userId', ipAllowlist, rateLimiter, requireAut
 
     const hasKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
     if (!hasKey || DEV_AUTH_BYPASS) {
-      return res.json({ success: true, status: { is_verified: false, verification_timestamp: null, verification_method: null, verification_token_id: null, has_valid_token: false, token_expires_at: null } })
+      // In dev mode or when service key is missing, use basic Supabase verification
+      const isVerified = Boolean(user.email_confirmed_at);
+      return res.json({ 
+        success: true, 
+        status: { 
+          is_verified: isVerified, 
+          verification_timestamp: user.email_confirmed_at || null, 
+          verification_method: isVerified ? 'supabase_email' : null, 
+          verification_token_id: null, 
+          has_valid_token: isVerified, 
+          token_expires_at: null 
+        } 
+      })
     }
     const statusResult = await verificationServiceEnhanced.getUserVerificationStatus(targetUserId)
     if (!statusResult.success) {
@@ -791,6 +837,29 @@ app.post('/api/verification/cleanup', ipAllowlist, rateLimiter, requireAuth, asy
   }
 })
 
+app.get('/api/resend-quota', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
+  try {
+    const user = req.user
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!serviceKey) {
+      return res.status(500).json({ success: false, error: 'Server not configured' })
+    }
+    const admin = createClient(supabaseUrl, serviceKey)
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { data, error } = await admin.from('verification_audit_log').select('id, created_at').eq('user_id', user.id).eq('type', 'send_verification').gte('created_at', since)
+    if (error) {
+      return res.status(500).json({ success: false, error: 'Failed to read quota' })
+    }
+    const used = data?.length || 0
+    const remaining = Math.max(0, 3 - used)
+    const reset_at = new Date(Date.now() + (60 * 60 * 1000)).toISOString()
+    return res.json({ success: true, used, remaining, reset_at })
+  } catch {
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
 app.post('/api/auth/reauth-link', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
   try {
     const user = req.user
@@ -818,6 +887,13 @@ app.post('/api/auth/reauth-link', ipAllowlist, rateLimiter, requireAuth, async (
 app.post('/api/optimize', ipAllowlist, rateLimiter, requireVerified, wrap(optimizeHandler));
 app.post('/api/contact', ipAllowlist, rateLimiter, wrap(contactHandler));
 
+// ATS Analysis routes
+const ATS_MW = DEV_AUTH_BYPASS ? [ipAllowlist, rateLimiter] : [ipAllowlist, rateLimiter, requireVerified];
+app.post('/api/ats/analyze', ...ATS_MW, analyzeATS);
+app.get('/api/ats/progress/:sessionId', ...ATS_MW, getAnalysisProgress);
+app.get('/api/ats/results/:sessionId', ...ATS_MW, getAnalysisResults);
+app.delete('/api/ats/session/:sessionId', ...ATS_MW, cleanupSession);
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🔌 Dev API server running at http://localhost:${PORT}`);
@@ -825,6 +901,10 @@ app.listen(PORT, () => {
   console.log('   GET  /api/me');
   console.log('   POST /api/optimize');
   console.log('   POST /api/contact');
+  console.log('   POST /api/ats/analyze');
+  console.log('   GET  /api/ats/progress/:sessionId');
+  console.log('   GET  /api/ats/results/:sessionId');
+  console.log('   DELETE /api/ats/session/:sessionId');
   console.log('   GET  /api/csrf');
   console.log('   POST /api/send-verification');
   console.log('   GET  /api/verify');
@@ -869,5 +949,51 @@ app.get('/api/verification-metrics', ipAllowlist, rateLimiter, requireAuth, asyn
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
+ 
+app.get('/api/verification-quota', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
+  try {
+    const user = req.user
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!serviceKey) {
+      return res.status(500).json({ success: false, error: 'Server not configured' })
+    }
+    const admin = createClient(supabaseUrl, serviceKey)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const { data: attempts, error: attemptsErr } = await admin
+      .from('verification_audit_log')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('type', 'send_verification')
+      .gte('created_at', oneHourAgo)
+    if (attemptsErr) {
+      return res.status(500).json({ success: false, error: 'Failed to check resend quota' })
+    }
+    if ((attempts?.length || 0) >= 3) {
+      return res.status(429).json({ success: false, error: 'Resend limit reached. Try again later.' })
+    }
 
+    // Ensure profile defaults and update attempt tracking
+    const expectedExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const attemptsCount = (attempts?.length || 0) + 1
+    await admin
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        verified: false,
+        verification_method: 'supabase_email',
+        last_verification_attempt_at: new Date().toISOString(),
+        verification_attempts_count: attemptsCount,
+        verification_expires_at: expectedExpiry,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'id' })
 
+    res.json({
+      success: true,
+      remaining: Math.max(0, 3 - (attempts?.length || 0)),
+      reset_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    })
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Internal error checking quota' })
+  }
+})

@@ -27,6 +27,8 @@ function strengthToColors(strength: string) {
 
 
 export default function RegisterForm({ onToggle }: RegisterFormProps) {
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -46,6 +48,10 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
     setSuccess('')
 
     // Basic validation
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('Please enter your first and last name.')
+      return
+    }
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailPattern.test(email)) {
       setError('Please enter a valid email address.')
@@ -72,7 +78,7 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: redirectTo },
+        options: { emailRedirectTo: redirectTo, data: { first_name: firstName.trim(), last_name: lastName.trim(), full_name: `${firstName.trim()} ${lastName.trim()}` } },
       })
       if (error) throw error
       if (!data.user) throw new Error('Registration failed. Please try again.')
@@ -150,6 +156,36 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
       )}
 
       <form onSubmit={handleRegister} className="space-y-4" aria-label="Registration form">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-first-name">
+              First Name
+            </label>
+            <input
+              id="reg-first-name"
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Jane"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-last-name">
+              Last Name
+            </label>
+            <input
+              id="reg-last-name"
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Doe"
+              required
+            />
+          </div>
+        </div>
         <div className="space-y-2">
           <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-email">
             Email
