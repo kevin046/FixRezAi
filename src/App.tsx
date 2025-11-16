@@ -17,6 +17,7 @@ import AdminMetricsPage from './pages/AdminMetrics'
 import AccessibilityPage from './pages/accessibility'
 import SecurityPage from './pages/security'
 import ATSRatingPage from './pages/ATSRatingPage'
+import SitemapPage from './pages/sitemap'
 import { Toaster } from 'sonner'
 import Footer from '@/components/Footer'
 import { testApiConnectivity } from '@/lib/apiTest'
@@ -25,7 +26,7 @@ function App() {
   const { user, setUser, setVerificationStatus, logout, verificationStatus, verificationLoaded, fetchVerificationStatus } = useAuthStore()
   
   // Check URL path to determine initial view
-  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' => {
+  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' => {
     const path = window.location.pathname
     if (path === '/optimize') return 'wizard'
     if (path === '/terms') return 'terms'
@@ -38,11 +39,12 @@ function App() {
     if (path === '/admin/metrics') return 'adminMetrics'
     if (path === '/accessibility') return 'accessibility'
     if (path === '/security') return 'security'
+    if (path === '/sitemap') return 'sitemap'
     if (path === '/ats-rating') return 'atsRating'
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating'>(
+  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap'>(
     getInitialView()
   )
 
@@ -67,6 +69,7 @@ function App() {
     else if (view === 'adminMetrics') path = '/admin/metrics'
     else if (view === 'accessibility') path = '/accessibility'
     else if (view === 'security') path = '/security'
+    else if (view === 'sitemap') path = '/sitemap'
     else if (view === 'atsRating') path = '/ats-rating'
     window.history.pushState({}, '', path)
   }
@@ -249,6 +252,8 @@ function App() {
         return <SecurityPage />
       case 'atsRating':
         return <ATSRatingPage />
+      case 'sitemap':
+        return <SitemapPage />
       default:
         return <Hero onGetStarted={handleGetStarted} user={user} onLogout={handleLogout} />
     }

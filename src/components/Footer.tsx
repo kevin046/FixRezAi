@@ -18,6 +18,7 @@ export default function Footer() {
             <a href="/contact" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Contact</a>
             <a href="/accessibility" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Accessibility</a>
             <a href="/settings#security" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Security</a>
+            <a href="/sitemap" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Sitemap</a>
             <span className="text-gray-400">•</span>
             <span className="text-gray-600 dark:text-gray-300">Powered by Summit Pixels Inc.</span>
             <span className="text-gray-400">•</span>
