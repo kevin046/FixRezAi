@@ -39,7 +39,6 @@ const logos = [
 import { User } from '@supabase/supabase-js'
 import { useAuthStore } from '@/stores/authStore'
 import { isVerified } from '@/lib/auth'
-import VerificationIndicator from '@/components/VerificationIndicator'
 import { useResumeStore } from '@/stores/resumeStore'
 
 interface HeroProps {
