@@ -2,7 +2,7 @@ import React from "react";
 import { useAuthStore } from '@/stores/authStore'
 import { Home, LayoutDashboard, Settings, Shield, Lock, Key, Eye, AlertTriangle, CheckCircle, Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
 import LogoutButton from '@/components/LogoutButton'
-import VerificationIndicator from '@/components/VerificationIndicator'
+ 
 import { isVerified } from '@/lib/auth'
 
 const SecurityPage: React.FC = () => {
@@ -26,7 +26,7 @@ const SecurityPage: React.FC = () => {
                   <span className="text-gray-700 dark:text-gray-300">
                     Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
                   </span>
-                  <VerificationIndicator size="sm" />
+                  
                   <a
                     href="/"
                     className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"

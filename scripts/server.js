@@ -90,6 +90,15 @@ app.get('/api/status', (req, res) => {
 function wrap(handler) {
   return async (req, res) => {
     try {
+    console.log('🔍 Verification Status Debug:', {
+      hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      devAuthBypass: DEV_AUTH_BYPASS,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      emailConfirmedAt: req.user.email_confirmed_at,
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV
+    });
       await handler(req, res);
     } catch (err) {
       console.error('API route error:', err?.message || err);
@@ -595,10 +604,20 @@ app.get('/api/verify', ipAllowlist, rateLimiter, verificationMiddleware.logVerif
 app.get('/api/verification/status', ipAllowlist, rateLimiter, requireAuth, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
   try {
     const user = req.user
+    console.log('🔍 Verification Status Debug:', {
+      hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      devAuthBypass: DEV_AUTH_BYPASS,
+      userId: user.id,
+      userEmail: user.email,
+      emailConfirmedAt: user.email_confirmed_at,
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV
+    });
     const hasKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
     if (!hasKey || DEV_AUTH_BYPASS) {
       // In dev mode or when service key is missing, use basic Supabase verification
       const isVerified = Boolean(user.email_confirmed_at);
+    console.log('📋 Using basic Supabase verification:', { isVerified, emailConfirmedAt: user.email_confirmed_at });
       return res.json({ 
         success: true, 
         status: { 
@@ -852,6 +871,15 @@ app.post('/api/verification/cleanup', ipAllowlist, rateLimiter, requireAuth, asy
 
 app.get('/api/resend-quota', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
   try {
+    console.log('🔍 Verification Status Debug:', {
+      hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      devAuthBypass: DEV_AUTH_BYPASS,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      emailConfirmedAt: req.user.email_confirmed_at,
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV
+    });
     const user = req.user
     const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -875,6 +903,15 @@ app.get('/api/resend-quota', ipAllowlist, rateLimiter, requireAuth, async (req, 
 
 app.post('/api/auth/reauth-link', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
   try {
+    console.log('🔍 Verification Status Debug:', {
+      hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      devAuthBypass: DEV_AUTH_BYPASS,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      emailConfirmedAt: req.user.email_confirmed_at,
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV
+    });
     const user = req.user
     const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -965,6 +1002,15 @@ app.get('/api/verification-metrics', ipAllowlist, rateLimiter, requireAuth, asyn
  
 app.get('/api/verification-quota', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
   try {
+    console.log('🔍 Verification Status Debug:', {
+      hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      devAuthBypass: DEV_AUTH_BYPASS,
+      userId: req.user.id,
+      userEmail: req.user.email,
+      emailConfirmedAt: req.user.email_confirmed_at,
+      nodeEnv: process.env.NODE_ENV,
+      vercelEnv: process.env.VERCEL_ENV
+    });
     const user = req.user
     const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY

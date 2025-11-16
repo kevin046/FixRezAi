@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, AlertCircle, Mail, Clock, RefreshCw, Shield } from 'lucide-react';
-import VerificationIndicator from '@/components/VerificationIndicator';
+ 
 import VerificationErrorHandler from '@/components/VerificationErrorHandler';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/lib/supabase';
@@ -204,11 +204,7 @@ const EnhancedVerify: React.FC = () => {
             </button>
           </div>
           
-          <VerificationIndicator 
-            showDetails={showDetails}
-            size="lg"
-            className="mb-4"
-          />
+          
 
           {verificationResult && (
             <div className={`p-4 rounded-lg border ${verificationResult.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'} mb-4`}>

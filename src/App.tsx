@@ -19,6 +19,7 @@ import SecurityPage from './pages/security'
 import ATSRatingPage from './pages/ATSRatingPage'
 import { Toaster } from 'sonner'
 import Footer from '@/components/Footer'
+import { testApiConnectivity } from '@/lib/apiTest'
 
 function App() {
   const { user, setUser, setVerificationStatus, logout, verificationStatus, verificationLoaded, fetchVerificationStatus } = useAuthStore()
@@ -122,6 +123,17 @@ function App() {
   }, [user])
 
   const prevUserIdRef = { current: null as string | null }
+  
+  // Run API connectivity test on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      testApiConnectivity().then(results => {
+        console.log('🔍 API Connectivity Test Results:', results);
+      }).catch(error => {
+        console.error('❌ API test failed:', error);
+      });
+    }
+  }, []);
   
   // Check for existing session on mount
   useEffect(() => {

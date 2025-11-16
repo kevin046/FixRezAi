@@ -3,6 +3,7 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Download, FileText, Code, CheckCircle, AlertCircle, FileImage } from 'lucide-react'
 import { exportAsText, exportAsJSON, exportLinkedInSummary } from '../../lib/exportUtils'
+import { logExport } from '@/lib/analytics'
 
 import { pdf } from '@react-pdf/renderer'
 import { ResumeTemplatePDF } from '../ResumeTemplatePDF'
@@ -57,7 +58,19 @@ export function ExportStep({ optimizedResume }: ExportStepProps) {
             link.click()
             document.body.removeChild(link)
             URL.revokeObjectURL(url)
-
+
+            await logExport({
+              id: crypto.randomUUID(),
+              ts: Date.now(),
+              format: 'pdf',
+              template,
+              filename,
+              fileSizeBytes: pdfBlob.size,
+              exportDataHash: null,
+              ipAddress: null,
+              userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'Unknown'
+            })
+
           } catch (pdfError) {
             console.error('PDF Export Error:', pdfError)
             throw new Error(`PDF export failed: ${pdfError instanceof Error ? pdfError.message : String(pdfError)}`)

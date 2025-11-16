@@ -28,7 +28,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 import LogoutButton from '@/components/LogoutButton'
 import { isVerified, resendVerification, canResend, getResendCooldownRemaining } from '@/lib/auth'
-import VerificationIndicator from '@/components/VerificationIndicator'
+ 
 import { useTheme } from '@/hooks/useTheme'
 import { toast } from 'sonner'
 
@@ -354,7 +354,7 @@ const SettingsPage: React.FC = () => {
                   <span className="text-gray-700 dark:text-gray-300 text-sm">
                     Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
                   </span>
-                  <VerificationIndicator size="sm" />
+                  
                   <a
                     href="/"
                     className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center gap-1"

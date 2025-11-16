@@ -1,8 +1,26 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/" }
-  ]
+  ],
+  "env": {
+    "OPENROUTER_API_KEY": "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",
+    "OPENROUTER_MODEL": "meta-llama/llama-3.3-70b-instruct:free",
+    "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+    "OPENROUTER_REFERER": "https://www.fixrez.com",
+    "OPENROUTER_TITLE": "FixRez",
+    "SUPABASE_URL": "https://oailemrpflfahdhoxbbx.supabase.co",
+    "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9haWxlbXJwZmxmYWhkaG94YmJ4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjA2MTMwMCwiZXhwIjoyMDc3NjM3MzAwfQ.cL-2Xzo06UH9LWUJBiXkpCSbgT1l2zlywNzXXGZHbno",
+    "CORS_ORIGINS": "https://www.fixrez.com,https://fixrez.com",
+    "NODE_ENV": "production",
+    "DEV_AUTH_BYPASS": "false",
+    "DEV_AI_MOCK": "false"
+  }
 }

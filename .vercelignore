@@ -2,7 +2,9 @@
 scripts/
 api/server.js
 api/test-*.js
+api/test.js
 api/verification-status-fixed.js
+fixrez-nextjs/
 
 # Exclude development and build artifacts
 *.log

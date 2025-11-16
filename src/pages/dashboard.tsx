@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { isVerified } from '@/lib/auth'
 import { useResumeStore } from '@/stores/resumeStore'
 import { calculateATSScore, ATSScore } from '@/lib/atsScoring'
-import VerificationIndicator from '@/components/VerificationIndicator'
+ 
 
 export default function DashboardPage() {
   const [query, setQuery] = useState('')
@@ -129,7 +129,7 @@ export default function DashboardPage() {
                   <span className="text-gray-700 dark:text-gray-300">
                     Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
                   </span>
-                  <VerificationIndicator size="sm" />
+                  
                   <a
                     href="/"
                     className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center gap-1"
