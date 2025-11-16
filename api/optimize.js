@@ -24,14 +24,16 @@ Rules:
 5. Use Canadian spelling
 6. PROFESSIONAL EXPERIENCE: Select 2-3 MOST RELEVANT positions from the user's actual resume that align with the target job. Do NOT create fictional experience. Extract actual companies, dates, and achievements from the resume, then optimize the bullet points with job-relevant keywords and quantifiable results.
 7. EXPERIENCE CALCULATION: Calculate total years of experience from the ACTUAL employment dates in the resume. Sum up all relevant work experience and reflect this accurately in the professional summary.
+8. TECHNICAL SKILLS PRESERVATION: EXTRACT and PRESERVE all technical skills, software, tools, and technologies mentioned in the original resume. Do NOT replace them with generic terms. If the user lists Photoshop, HTML, CSS, JavaScript, etc., include them exactly as listed in the technical skills section.
+9. PORTFOLIO INCLUSION: If the resume mentions a portfolio or personal website link, include it in the contact information section.
 
 JSON format:
 {
-  "header": {"name": "Name", "contact": "City, Province • email • phone"},
+  "header": {"name": "Name", "contact": "City, Province • email • phone • portfolio (if mentioned)"},
   "summary": "2-3 sentence summary with job keywords",
   "experience": [{"company": "Name", "location": "City, Province", "dates": "MMM YYYY - MMM YYYY", "title": "Title", "bullets": ["achievement with keywords"]}],
   "education": [{"school": "Name", "location": "City, Province", "dates": "Year - Year", "degree": "Degree"}],
-  "additional": {"technical_skills": "core competencies and professional skills relevant to the role, focusing on methodologies, analytical skills, and industry expertise rather than specific software tools unless mentioned in job description", "languages": "languages", "certifications": "certs"}
+  "additional": {"technical_skills": "EXACT technical skills from original resume (Photoshop, HTML, CSS, JavaScript, etc.) plus any relevant job keywords", "languages": "languages", "certifications": "certs"}
 }`;
 
 const envModel = process.env.OPENROUTER_MODEL;
@@ -84,6 +86,95 @@ function extractFirstJson(content) {
     }
   }
   return null;
+}
+
+function extractTechnicalSkills(resumeText) {
+  if (!resumeText || typeof resumeText !== 'string') return '';
+  
+  const skills = [];
+  const lines = resumeText.toLowerCase().split('\n');
+  
+  // Common technical skills patterns
+  const techPatterns = [
+    /\b(photoshop|illustrator|indesign|premiere|after effects|figma|sketch|canva)\b/g,
+    /\b(html|css|javascript|js|typescript|ts|react|vue|angular|node|nodejs|express)\b/g,
+    /\b(python|java|cpp|c\+\+|c#|csharp|php|ruby|go|rust|swift|kotlin)\b/g,
+    /\b(mysql|postgresql|mongodb|sqlite|redis|docker|kubernetes|aws|azure|gcp)\b/g,
+    /\b(git|github|gitlab|bitbucket|jira|trello|slack|microsoft office|excel|word|powerpoint)\b/g,
+    /\b(adobe|microsoft|google|autodesk|blender|maya|3ds max|cinema 4d)\b/g
+  ];
+  
+  // Look for skills sections
+  let inSkillsSection = false;
+  for (const line of lines) {
+    if (line.includes('technical') && line.includes('skill')) {
+      inSkillsSection = true;
+      continue;
+    }
+    if (inSkillsSection && (line.includes('experience') || line.includes('education') || line.includes('project'))) {
+      inSkillsSection = false;
+      break;
+    }
+    if (inSkillsSection && line.trim()) {
+      // Extract skills from line
+      for (const pattern of techPatterns) {
+        const matches = line.match(pattern);
+        if (matches) {
+          skills.push(...matches.map(skill => skill.trim()));
+        }
+      }
+    }
+  }
+  
+  // Also scan entire resume for technical terms
+  if (skills.length === 0) {
+    for (const pattern of techPatterns) {
+      const matches = resumeText.toLowerCase().match(pattern);
+      if (matches) {
+        skills.push(...matches.map(skill => skill.trim()));
+      }
+    }
+  }
+  
+  // Remove duplicates and return as comma-separated string
+  const uniqueSkills = [...new Set(skills)];
+  return uniqueSkills.join(', ');
+}
+
+function extractPortfolioLink(resumeText) {
+  if (!resumeText || typeof resumeText !== 'string') return '';
+  
+  // Common portfolio patterns
+  const portfolioPatterns = [
+    /(?:portfolio|website|site|portfolio site):\s*(https?:\/\/[^\s]+)/gi,
+    /(?:behance|dribbble|github|gitlab|codepen|personal site):\s*(https?:\/\/[^\s]+)/gi,
+    /\b(https?:\/\/[^\s]+(?:portfolio|website|design|dev|code|art|gallery)[^\s]*)\b/gi,
+    /\b(https?:\/\/[^\s]*(?:behance\.net|dribbble\.com|github\.com|codepen\.io)[^\s]*)\b/gi
+  ];
+  
+  for (const pattern of portfolioPatterns) {
+    const matches = resumeText.match(pattern);
+    if (matches && matches.length > 0) {
+      // Return the first match, cleaned up
+      return matches[0].replace(/^(?:portfolio|website|site|portfolio site|behance|dribbble|github|gitlab|codepen|personal site):\s*/i, '').trim();
+    }
+  }
+  
+  // Look for any URL that might be a portfolio
+  const urlPattern = /https?:\/\/[^\s]+/gi;
+  const urls = resumeText.match(urlPattern);
+  if (urls && urls.length > 0) {
+    // Filter out common non-portfolio URLs
+    const portfolioUrls = urls.filter(url => 
+      !url.includes('linkedin.com') && 
+      !url.includes('facebook.com') && 
+      !url.includes('twitter.com') && 
+      !url.includes('instagram.com')
+    );
+    return portfolioUrls.length > 0 ? portfolioUrls[0].trim() : '';
+  }
+  
+  return '';
 }
 
 function extractJsonCandidateFromString(content) {
@@ -329,7 +420,25 @@ export default async function handler(req, res) {
       });
     }
 
-    const composePrompt = (rText, jDesc) => `Resume:\n${rText}\n\nJob Description:\n${jDesc}`;
+    const composePrompt = (rText, jDesc) => {
+      const technicalSkills = extractTechnicalSkills(rText);
+      const portfolioLink = extractPortfolioLink(rText);
+      
+      console.log('🔍 Technical Skills Extracted:', technicalSkills || 'none found');
+      console.log('🌐 Portfolio Link Extracted:', portfolioLink || 'none found');
+      
+      let prompt = `Resume:\n${rText}\n\nJob Description:\n${jDesc}`;
+      
+      if (technicalSkills) {
+        prompt += `\n\nIMPORTANT: Preserve these exact technical skills in the optimized resume: ${technicalSkills}`;
+      }
+      
+      if (portfolioLink) {
+        prompt += `\n\nIMPORTANT: Include this portfolio link in the contact information: ${portfolioLink}`;
+      }
+      
+      return prompt;
+    };
     const truncate = (text, max) => (text || '').substring(0, max);
 
     // Provider spacing / cooldown checks
