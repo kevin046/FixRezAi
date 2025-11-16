@@ -121,49 +121,53 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
       )}
       {/* Navigation Bar */}
       <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-3 sm:py-4">
           <div className="flex justify-between items-center">
-            <a href="/" className="inline-flex items-center gap-2" aria-label="FixRez AI home">
-              <img src="/fixrez-favicon-black.svg" alt="FixRez AI" className="h-12 w-20" />
-              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">FixRez AI</span>
+            <a href="/" className="inline-flex items-center gap-2 flex-shrink-0" aria-label="FixRez AI home">
+              <img src="/fixrez-favicon-black.svg" alt="FixRez AI" className="h-8 w-14 sm:h-12 sm:w-20" />
+              <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap">FixRez AI</span>
             </a>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               {user ? (
                 <>
-                  <span className="text-gray-700 dark:text-gray-300">
+                  <span className="hidden sm:inline text-gray-700 dark:text-gray-300 text-sm">
                     Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
                   </span>
 
 
                   <a
                     href="/dashboard"
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   >
-                    Dashboard
+                    <span className="hidden sm:inline">Dashboard</span>
+                    <span className="sm:hidden">Dash</span>
                   </a>
                   <a
                     href="/settings"
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   >
-                    Settings
+                    <span className="hidden sm:inline">Settings</span>
+                    <span className="sm:hidden">⚙️</span>
                   </a>
                   <LogoutButton
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                   />
                 </>
               ) : (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => { window.location.href = '/auth?mode=login' }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                   >
-                    Login
+                    <span className="hidden sm:inline">Login</span>
+                    <span className="sm:hidden">Sign In</span>
                   </button>
                   <button
                     onClick={() => { window.location.href = '/auth?mode=register' }}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                    className="px-3 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
                   >
-                    Register
+                    <span className="hidden sm:inline">Register</span>
+                    <span className="sm:hidden">Sign Up</span>
                   </button>
                 </div>
               )}
@@ -172,16 +176,16 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
         </div>
       </nav>
 
-      <div className="container mx-auto px-4 py-16">
+      <div className="container mx-auto px-4 py-12 sm:py-16">
         <div className="flex flex-col items-center max-w-4xl mx-auto">
           {/* Hero Badge */}
-          <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-4 py-2 rounded-full text-sm font-medium mb-8">
-            <Sparkles className="w-4 h-4" />
+          <div className="inline-flex items-center gap-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium mb-6 sm:mb-8">
+            <Sparkles className="w-3 h-3 sm:w-4 sm:h-4" />
             AI-Powered Resume Optimization
           </div>
 
           {/* Main Heading */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white mb-6 leading-tight text-center">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-6 leading-tight text-center px-2">
             FixRez AI: Professional Resume Optimization Tool with{' '}
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Advanced AI Technology
@@ -189,125 +193,116 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
           </h1>
 
           {/* Subtitle */}
-          <h2 className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-12 max-w-3xl mx-auto leading-relaxed text-center">
+          <h2 className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-600 dark:text-gray-300 mb-8 sm:mb-12 max-w-2xl md:max-w-3xl mx-auto leading-relaxed text-center px-2">
             FixRez AI uses advanced artificial intelligence to tailor your resume for any job description. 
             Get past ATS systems and land more interviews with personalized optimization and AI-powered insights.
           </h2>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-16 w-full">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4 mb-12 sm:mb-16 w-full px-2">
             <button 
               onClick={onGetStarted}
-              className="w-full sm:w-auto px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition inline-flex items-center justify-center"
+              className="w-full sm:w-auto px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition inline-flex items-center justify-center"
             >
               Start Optimizing
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2" />
             </button>
-            {user && (
-              <button 
-                onClick={() => window.location.href = '/ats-rating'}
-                className="w-full sm:w-auto px-6 py-3 text-sm font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-full hover:bg-blue-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition inline-flex items-center justify-center"
-              >
-                ATS Rating
-                <Medal className="w-4 h-4 ml-2" />
-              </button>
-            )}
           </div>
           
           {/* Live Counter */}
-          <div className="text-center mb-16">
-            <p className="text-lg text-gray-600 dark:text-gray-300">Join over <span className="font-bold text-gray-900 dark:text-white">{resumesProcessed.toLocaleString()}</span> resumes optimized today!</p>
+          <div className="text-center mb-8 sm:mb-16">
+            <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300">Join over <span className="font-bold text-gray-900 dark:text-white">{resumesProcessed.toLocaleString()}</span> resumes optimized today!</p>
           </div>
 
           {/* Feature Cards */}
-          <div className="grid md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto">
-            <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-5xl mx-auto">
+            <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-3 sm:mb-4 mx-auto">
+                <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
                 Smart Analysis
               </h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">
                 AI analyzes job descriptions and optimizes your resume content for maximum ATS compatibility and recruiter appeal.
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <Sparkles className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center mb-3 sm:mb-4 mx-auto">
+                <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
                 5-Step Process
               </h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">
                 Simple wizard guides you through job description input, resume upload, AI processing, preview, and export.
               </p>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <Download className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 md:p-8 rounded-2xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center mb-3 sm:mb-4 mx-auto">
+                <Download className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 dark:text-green-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
                 Multiple Formats
               </h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <p className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">
                 Export your optimized resume as PDF or JSON-LD for LinkedIn and other platforms.
               </p>
             </div>
           </div>
 
           {/* Trusted by Section */}
-          <div className="mt-24 w-full">
-            <p className="text-sm text-center text-gray-500 dark:text-gray-400 mb-8">Trusted by members hired at...</p>
+          <div className="mt-16 sm:mt-24 w-full">
+            <p className="text-xs sm:text-sm text-center text-gray-500 dark:text-gray-400 mb-4 sm:mb-8">Trusted by members hired at...</p>
             <div className="relative w-full overflow-hidden">
               <div className="flex animate-scroll">
                 {[...logos, ...logos].map((logo, index) => (
-                  <img key={index} src={logo.src} alt={logo.alt} className="h-6 sm:h-8 object-contain mx-6 md:mx-12 flex-shrink-0" />
+                  <img key={index} src={logo.src} alt={logo.alt} className="h-4 sm:h-6 md:h-8 object-contain mx-3 sm:mx-6 md:mx-12 flex-shrink-0" />
                 ))}
               </div>
             </div>
           </div>
 
           {/* Testimonials Section */}
-          <div className="mt-24 text-center">
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-12">What Our Users Say</h2>
-            <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="mt-16 sm:mt-24 text-center">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-8 sm:mb-12">What Our Users Say</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-5xl mx-auto">
               <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200 dark:border-gray-700">
                 <CardHeader>
                   <div className="flex items-center justify-center mb-2">
-                    {[...Array(5)].map((_, i) => <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />)}
+                    {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 fill-current" />)}
                   </div>
-                  <CardTitle className="text-xl font-semibold text-gray-800 dark:text-white">"A Game Changer!"</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">"A Game Changer!"</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4 italic">"FixRez helped me get past the ATS and land my dream job at Google. The AI optimization is incredible."</p>
-                  <p className="font-semibold text-right text-gray-700 dark:text-gray-400">- Sarah L.</p>
+                  <p className="text-gray-600 dark:text-gray-300 mb-3 sm:mb-4 italic text-sm sm:text-base">"FixRez helped me get past the ATS and land my dream job at Google. The AI optimization is incredible."</p>
+                  <p className="font-semibold text-right text-gray-700 dark:text-gray-400 text-sm">- Sarah L.</p>
                 </CardContent>
               </Card>
               <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200 dark:border-gray-700">
                 <CardHeader>
                   <div className="flex items-center justify-center mb-2">
-                    {[...Array(5)].map((_, i) => <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />)}
+                    {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 fill-current" />)}
                   </div>
-                  <CardTitle className="text-xl font-semibold text-gray-800 dark:text-white">"Finally, a tool that works!"</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">"Finally, a tool that works!"</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4 italic">"I was skeptical at first, but after using FixRez, I got 3x more interviews. Highly recommended!"</p>
-                  <p className="font-semibold text-right text-gray-700 dark:text-gray-400">- Michael B.</p>
+                  <p className="text-gray-600 dark:text-gray-300 mb-3 sm:mb-4 italic text-sm sm:text-base">"I was skeptical at first, but after using FixRez, I got 3x more interviews. Highly recommended!"</p>
+                  <p className="font-semibold text-right text-gray-700 dark:text-gray-400 text-sm">- Michael B.</p>
                 </CardContent>
               </Card>
               <Card className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border-gray-200 dark:border-gray-700">
                 <CardHeader>
                   <div className="flex items-center justify-center mb-2">
-                    {[...Array(5)].map((_, i) => <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />)}
+                    {[...Array(5)].map((_, i) => <Star key={i} className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-400 fill-current" />)}
                   </div>
-                  <CardTitle className="text-xl font-semibold text-gray-800 dark:text-white">"Invaluable for career changers"</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">"Invaluable for career changers"</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4 italic">"As someone switching careers, FixRez was essential in tailoring my resume and highlighting my transferable skills."</p>
-                  <p className="font-semibold text-right text-gray-700 dark:text-gray-400">- Emily C.</p>
+                  <p className="text-gray-600 dark:text-gray-300 mb-3 sm:mb-4 italic text-sm sm:text-base">"As someone switching careers, FixRez was essential in tailoring my resume and highlighting my transferable skills."</p>
+                  <p className="font-semibold text-right text-gray-700 dark:text-gray-400 text-sm">- Emily C.</p>
                 </CardContent>
               </Card>
             </div>
