@@ -282,31 +282,31 @@ const getDynamicStyles = (mode: ScaleMode, fitLevel: 0 | 1 | 2 = 0) => ({
   page: {
     fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel === 2 ? 8 : fitLevel === 1 ? 9 : 9) : 10,
     lineHeight: mode === 'expanded' ? 1.25 : mode === 'compact' ? (fitLevel >= 1 ? 1.08 : 1.12) : 1.15,
-    padding: mode === 'expanded' ? 72 : mode === 'compact' ? (fitLevel === 2 ? 36 : fitLevel === 1 ? 48 : 56) : 64,
+    padding: mode === 'expanded' ? 64 : mode === 'compact' ? (fitLevel === 2 ? 36 : fitLevel === 1 ? 48 : 52) : 56,
   },
   sectionsContainer: {
-    justifyContent: mode === 'expanded' ? 'space-between' : 'flex-start',
+    justifyContent: 'flex-start',
   },
   section: {
-    marginBottom: mode === 'expanded' ? 12 : mode === 'compact' ? (fitLevel >= 1 ? 6 : 8) : 10,
+    marginBottom: mode === 'expanded' ? 10 : mode === 'compact' ? (fitLevel >= 1 ? 5 : 7) : 8,
   },
   name: { fontSize: mode === 'expanded' ? 26 : mode === 'compact' ? (fitLevel === 2 ? 16 : fitLevel === 1 ? 18 : 20) : 22 },
   sectionTitle: { fontSize: mode === 'expanded' ? 14 : mode === 'compact' ? 11 : 12, borderBottomWidth: mode === 'compact' && fitLevel >= 1 ? 0.3 : 0.5 },
   contactInfo: { fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10 },
-  contactLine: { marginBottom: mode === 'expanded' ? 10 : mode === 'compact' ? (fitLevel >= 1 ? 5 : 6) : 8 },
+  contactLine: { marginBottom: mode === 'expanded' ? 8 : mode === 'compact' ? (fitLevel >= 1 ? 4 : 5) : 6 },
   company: { fontSize: mode === 'expanded' ? 12 : mode === 'compact' ? (fitLevel >= 1 ? 10 : 11) : 11 },
   role: { fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10 },
   dates: { fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10 },
-  bulletRow: { marginBottom: mode === 'expanded' ? 1.0 : mode === 'compact' ? (fitLevel >= 1 ? 0.4 : 0.6) : 0.8 },
+  bulletRow: { marginBottom: mode === 'expanded' ? 0.9 : mode === 'compact' ? (fitLevel >= 1 ? 0.3 : 0.5) : 0.7 },
   bullet: { width: mode === 'compact' ? (fitLevel >= 1 ? 4 : 5) : 7 },
   bulletText: {
     fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10,
-    lineHeight: mode === 'expanded' ? 1.25 : mode === 'compact' ? (fitLevel >= 1 ? 1.08 : 1.18) : 1.22,
+    lineHeight: mode === 'expanded' ? 1.23 : mode === 'compact' ? (fitLevel >= 1 ? 1.07 : 1.16) : 1.2,
     paddingLeft: mode === 'compact' ? (fitLevel >= 1 ? 1 : 2) : 2,
   },
   additionalText: {
     fontSize: mode === 'expanded' ? 11 : mode === 'compact' ? (fitLevel >= 1 ? 9 : 10) : 10,
-    lineHeight: mode === 'expanded' ? 1.25 : mode === 'compact' ? (fitLevel >= 1 ? 1.08 : 1.18) : 1.22,
+    lineHeight: mode === 'expanded' ? 1.23 : mode === 'compact' ? (fitLevel >= 1 ? 1.07 : 1.16) : 1.2,
   },
 });
 
@@ -362,8 +362,8 @@ export const ResumeTemplatePDF: React.FC<{ resume: OptimizedResume; template?: T
   const contentLen = estimateContentLength(resume);
   const estLines = estimateTotalLines(resume);
   // Define fit levels based on estimated lines; aim for single-page
-  const fitLevel: 0 | 1 | 2 = estLines > 120 ? 2 : estLines > 95 ? 1 : 0;
-  const mode: ScaleMode = contentLen < 1200 ? 'expanded' : contentLen > 2200 ? 'compact' : 'normal';
+  const fitLevel: 0 | 1 | 2 = estLines > 105 ? 2 : estLines > 85 ? 1 : 0;
+  const mode: ScaleMode = contentLen < 1100 ? 'expanded' : contentLen > 1900 ? 'compact' : 'normal';
   const dyn = getDynamicStyles(mode, fitLevel);
   const tmpl = getTemplateStyles(template)
 

@@ -1,7 +1,14 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 
-// Load local env when running locally; Vercel will inject env in production
-dotenv.config({ path: '.env.local' });
+// Load local env when running locally; ensure correct path regardless of cwd
+try {
+  const cwdEnv = path.resolve(process.cwd(), '.env.local');
+  const rootEnv = path.resolve(__dirname, '../.env.local');
+  const envPath = fs.existsSync(cwdEnv) ? cwdEnv : rootEnv;
+  dotenv.config({ path: envPath });
+} catch {}
 
 const SYSTEM_PROMPT = `You are a resume optimization expert. Read the resume and job description, then return a JSON-optimized resume that includes relevant keywords from the job description.
 
@@ -23,7 +30,29 @@ JSON format:
   "additional": {"technical_skills": "core competencies and professional skills relevant to the role, focusing on methodologies, analytical skills, and industry expertise rather than specific software tools unless mentioned in job description", "languages": "languages", "certifications": "certs"}
 }`;
 
-const MODEL_FALLBACKS = [process.env.OPENROUTER_MODEL || 'meta-llama/llama-4-maverick:free'];
+const envModel = process.env.OPENROUTER_MODEL;
+
+// User-specified fallback models (free tier)
+const USER_FALLBACK_MODELS = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'deepseek/deepseek-chat-v3.1:free',
+  'qwen/qwen3-235b-a22b:free',
+  'deepseek/deepseek-r1-distill-llama-70b:free'
+];
+
+// Force Llama 3.3 as primary and exclude Llama 4 completely
+const FORCED_MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+
+// Ensure we only use user-specified models, reject any Llama 4 models
+const MODEL_FALLBACKS = [...USER_FALLBACK_MODELS];
+
+console.log('🤖 AI Model Configuration:');
+console.log('   Environment Model:', envModel || 'not set');
+console.log('   Forced Model:', FORCED_MODEL);
+console.log('   User Fallback Models:', USER_FALLBACK_MODELS);
+console.log('   Model Fallbacks:', MODEL_FALLBACKS);
+console.log('   Llama 4 Protection: ENABLED - Will reject any Llama 4 models');
 
 function extractFirstJson(content) {
   if (!content || typeof content !== 'string') return null;
@@ -112,7 +141,7 @@ function safeParseJson(candidate) {
 
 // Concurrency gate to limit parallel OpenRouter requests
 export const AI_STATUS = {
-  model: process.env.OPENROUTER_MODEL || 'meta-llama/llama-4-maverick:free',
+  model: USER_FALLBACK_MODELS[0], // Use primary model from user-specified list
   last429: null,
   lastOk: null,
   lastCall: null,
@@ -141,69 +170,97 @@ function releaseSlot() {
   if (next) next();
 }
 async function callOpenRouter(model, prompt, retries = 3) {
+  // Validate model is from our approved list
+  const isApprovedModel = USER_FALLBACK_MODELS.includes(model);
+  const forcedModel = isApprovedModel ? model : USER_FALLBACK_MODELS[0];
+  
+  console.log('🔧 callOpenRouter: Original model requested:', model);
+  console.log('🔧 callOpenRouter: Is approved model:', isApprovedModel);
+  console.log('🔧 callOpenRouter: Final model to use:', forcedModel);
+  
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('Missing OPENROUTER_API_KEY');
   }
-
-  const body = {
-    model,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: prompt }
-    ],
-    temperature: 0.2,
-    max_tokens: 1000
-  };
-
+  let OpenAI = null;
+  try {
+    const mod = await import('openai');
+    OpenAI = mod.default || mod.OpenAI || null;
+    console.log('✅ OpenAI SDK imported successfully:', !!OpenAI);
+  } catch (importErr) {
+    console.warn('⚠️  OpenAI SDK import failed, falling back to fetch:', importErr.message);
+  }
   let lastErr = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
     await acquireSlot();
     try {
-      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.OPENROUTER_REFERER || 'http://localhost:5176',
-          'X-Title': process.env.OPENROUTER_TITLE || 'FixRez'
-        },
-        body: JSON.stringify(body)
-      });
-
-      const text = await resp.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = null; }
-
-      if (!resp.ok) {
-        const status = resp.status;
-        const msg = data?.error?.message || data?.message || text || `Status ${status}`;
-        const err = new Error(`${status} ${msg}`);
-        err.status = status;
-        err.details = data;
-        err.model = model;
-        lastErr = err;
-        if ((status === 429 || status === 503) && attempt < retries) {
-          AI_STATUS.last429 = Date.now();
-          const retryAfterHeader = resp.headers?.get?.('retry-after');
-          const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : null;
-          const base = retryAfterMs || 60_000; // 1 minute base for 429
-          const backoff = base * Math.pow(2, attempt); // 1m, 2m, 4m
-          const jitter = Math.floor(Math.random() * 2000);
-          const waitMs = backoff + jitter;
-          console.warn(`OpenRouter ${status}; retrying in ${waitMs}ms (attempt ${attempt + 1}/${retries})`);
-          await new Promise((r) => setTimeout(r, waitMs));
-          continue;
+      if (OpenAI) {
+        const client = new OpenAI({
+          baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+          apiKey
+        });
+        const completion = await client.chat.completions.create({
+          model: forcedModel,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 1000
+        }, {
+          headers: {
+            'HTTP-Referer': process.env.OPENROUTER_REFERER || 'http://localhost:5176',
+            'X-Title': process.env.OPENROUTER_TITLE || 'FixRez'
+          }
+        });
+        AI_STATUS.lastOk = Date.now();
+        return completion;
+      } else {
+        const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.OPENROUTER_REFERER || 'http://localhost:5176',
+            'X-Title': process.env.OPENROUTER_TITLE || 'FixRez'
+          },
+          body: JSON.stringify({
+            model: forcedModel,
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.2,
+            max_tokens: 1000
+          })
+        });
+        const text = await resp.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = null; }
+        if (!resp.ok) {
+          const status = resp.status;
+          const msg = data?.error?.message || data?.message || text || `Status ${status}`;
+          const err = new Error(`${status} ${msg}`);
+          err.status = status;
+          err.details = data;
+          err.model = model;
+          lastErr = err;
+          if ((status === 429 || status === 503) && attempt < retries) {
+            AI_STATUS.last429 = Date.now();
+            const retryAfterHeader = resp.headers?.get?.('retry-after');
+            const retryAfterMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : null;
+            const base = retryAfterMs || 60_000;
+            const backoff = base * Math.pow(2, attempt);
+            const jitter = Math.floor(Math.random() * 2000);
+            const waitMs = backoff + jitter;
+            await new Promise((r) => setTimeout(r, waitMs));
+            continue;
+          }
+          throw err;
         }
-        throw err;
+        AI_STATUS.lastOk = Date.now();
+        return data;
       }
-
-      if (!data) {
-        console.warn('OpenRouter returned non-JSON response:', text.substring(0, 500));
-      }
-
-      AI_STATUS.lastOk = Date.now();
-      return data;
     } finally {
       releaseSlot();
     }
@@ -254,15 +311,17 @@ export default async function handler(req, res) {
     const truncate = (text, max) => (text || '').substring(0, max);
 
     // Provider spacing / cooldown checks
-    const MIN_SPACING_MS = Number(process.env.AI_MIN_SPACING_MS || 30_000);
+    const MIN_SPACING_MS = Number(process.env.AI_MIN_SPACING_MS || (process.env.NODE_ENV === 'development' ? 5_000 : 30_000));
     const COOLDOWN_MS = Number(process.env.AI_PROVIDER_COOLDOWN_MS || 300_000);
     const now = Date.now();
     if (AI_STATUS.cooldownUntil && now < AI_STATUS.cooldownUntil) {
       const waitMs = AI_STATUS.cooldownUntil - now;
+      res.set('Retry-After', String(Math.ceil(waitMs/1000)));
       return res.status(429).json({ success: false, error: 'Rate limited', details: `Provider cooldown active. Wait ~${Math.ceil(waitMs/1000)}s and retry.`, cooldownUntil: new Date(AI_STATUS.cooldownUntil).toISOString() });
     }
     if (AI_STATUS.lastCall && now - AI_STATUS.lastCall < MIN_SPACING_MS) {
       const waitMs = MIN_SPACING_MS - (now - AI_STATUS.lastCall);
+      res.set('Retry-After', String(Math.ceil(waitMs/1000)));
       return res.status(429).json({ success: false, error: 'Too frequent', details: `Please wait ~${Math.ceil(waitMs/1000)}s before next request.` });
     }
     AI_STATUS.lastCall = now;
@@ -271,8 +330,9 @@ export default async function handler(req, res) {
     const composedPrompt = prompt || composePrompt(truncate(resumeText, 3000), truncate(jobDescription, 2000));
 
     // Dev mock fallback to ensure UX during provider issues
-    const useMock = String(process.env.DEV_AI_MOCK || '').toLowerCase() === 'true';
-    const devBypass = String(process.env.DEV_AUTH_BYPASS || '').toLowerCase() === 'true';
+    const hasKey = Boolean(process.env.OPENROUTER_API_KEY);
+    const useMock = !hasKey && (String(process.env.DEV_AI_MOCK || '').toLowerCase() === 'true');
+    const devBypass = false;
     console.log('🧪 optimize flags:', { DEV_AI_MOCK: useMock, DEV_AUTH_BYPASS: devBypass, user: req.user?.email || 'none' })
     if (useMock) {
       const mock = buildMockResume(resumeText, jobDescription);
@@ -282,11 +342,16 @@ export default async function handler(req, res) {
 
     let lastError = null;
     const attemptedModels = [];
+    console.log('🧪 optimize: MODEL_FALLBACKS available:', MODEL_FALLBACKS);
+    console.log('🧪 optimize: AI_STATUS.model:', AI_STATUS.model);
     for (const model of MODEL_FALLBACKS) {
       try {
         console.log('🧪 optimize: attempting model', model);
+        console.log('🧪 optimize: calling callOpenRouter with model:', model);
         attemptedModels.push(model);
         const completion = await callOpenRouter(model, composedPrompt, 3);
+        console.log('✅ callOpenRouter completed successfully');
+        console.log('✅ Completion model used:', completion?.model || 'unknown');
         const choice = completion?.choices?.[0] || null;
         const message = choice?.message || {};
         let content = '';
@@ -307,7 +372,7 @@ export default async function handler(req, res) {
           content = choice.text;
         }
         if (!content && completion && typeof completion === 'object') {
-          console.warn('🧪 optimize: raw completion preview:', JSON.stringify(completion).substring(0, 600));
+          const preview = JSON.stringify(completion).substring(0, 600);
         }
         console.log('🧪 optimize: response content length', content?.length || 0);
         if (!content || content.length === 0) {

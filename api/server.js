@@ -17,6 +17,17 @@ import { analyzeATS, getAnalysisProgress, getAnalysisResults, cleanupSession } f
 import optimizeHandler, { AI_STATUS } from './optimize.js';
 import contactHandler from './contact.js';
 
+// Force reset AI_STATUS to ensure clean state
+console.log('🔄 Server startup: Resetting AI_STATUS before server starts...');
+AI_STATUS.model = 'meta-llama/llama-3.3-70b-instruct:free';
+AI_STATUS.last429 = null;
+AI_STATUS.lastOk = null;
+AI_STATUS.lastCall = null;
+AI_STATUS.cooldownUntil = null;
+AI_STATUS.active = 0;
+AI_STATUS.queue = 0;
+console.log('✅ AI_STATUS reset complete:', AI_STATUS);
+
 const app = express();
 // Strengthen CORS: allow localhost dev and deployed domains
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,https://fixrez-han4cbj05-kevin046s-projects.vercel.app,https://fixrez.com,https://www.fixrez.com')
@@ -27,6 +38,8 @@ const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http:
 // Dev bypass flag
 const DEV_AUTH_BYPASS = false;
 console.log('🔧 DEV_AUTH_BYPASS:', DEV_AUTH_BYPASS ? 'enabled' : 'disabled')
+console.log('🔑 OPENROUTER_API_KEY present:', Boolean(process.env.OPENROUTER_API_KEY))
+console.log('🧪 DEV_AI_MOCK:', String(process.env.DEV_AI_MOCK || '').toLowerCase() === 'true' ? 'enabled' : 'disabled')
 
 const corsOptions = {
   origin: function(origin, callback) {
