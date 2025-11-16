@@ -1,7 +1,12 @@
-node_modules
-build
-dist
-.git
-.trae
-.log
-.figma
+# Exclude test and development files from Vercel deployment
+scripts/
+api/server.js
+api/test-*.js
+api/verification-status-fixed.js
+
+# Exclude development and build artifacts
+*.log
+node_modules/
+dist/
+.vercel
+.env.local
