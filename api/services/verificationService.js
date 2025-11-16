@@ -341,8 +341,15 @@ class VerificationService {
     try {
       this.init(); // Initialize service if not already done
       
+      console.log('🔧 VerificationService.getUserVerificationStatus called:', {
+        userId,
+        hasAdmin: !!this.admin,
+        initialized: this.initialized
+      });
+      
       // Handle dev bypass user
       if (userId === '00000000-0000-0000-0000-000000000000') {
+        console.log('🔄 Dev bypass user detected');
         return {
           success: true,
           status: {
@@ -355,12 +362,29 @@ class VerificationService {
         };
       }
       
+      if (!this.admin) {
+        console.log('⚠️ Admin client not available, falling back to basic verification');
+        return {
+          success: true,
+          status: {
+            is_verified: false,
+            verification_timestamp: null,
+            verification_method: null,
+            has_valid_token: false,
+            token_expires_at: null
+          }
+        };
+      }
+      
       const { data, error } = await this.admin
         .rpc('get_user_verification_status', { user_uuid: userId });
 
       if (error) {
+        console.error('❌ RPC call failed:', error);
         throw new Error(`Failed to get verification status: ${error.message}`);
       }
+
+      console.log('✅ Verification status retrieved:', data[0]);
 
       return {
         success: true,

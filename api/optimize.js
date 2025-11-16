@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load local env when running locally; ensure correct path regardless of cwd
 try {
@@ -97,49 +101,26 @@ function extractJsonCandidateFromString(content) {
     const secondFence = content.indexOf(fence, firstFence + fence.length);
     if (secondFence > firstFence) {
       const inside = content.slice(firstFence + fence.length, secondFence);
-      const insideJson = extractFirstJson(inside);
-      if (insideJson) return insideJson;
+      const candidate = extractJsonCandidateFromString(inside);
+      if (candidate) return candidate;
     }
   }
-  // JSON snippet after colon
-  const colonIdx = content.indexOf('{');
-  if (colonIdx >= 0) {
-    const after = content.slice(colonIdx);
-    const afterJson = extractFirstJson(after);
-    if (afterJson) return afterJson;
-  }
-  return null;
+  // Inline JSON object
+  const inline = /\{[\s\S]*?\}/;
+  const match = content.match(inline);
+  return match ? match[0] : null;
 }
 
-function sanitizeJsonCandidate(jsonStr) {
-  if (!jsonStr || typeof jsonStr !== 'string') return null;
-  let s = jsonStr;
-  // Normalize smart quotes
-  s = s.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
-  // Remove trailing commas before } or ]
-  s = s.replace(/,\s*(}[\s\n\r]*)/g, '$1');
-  s = s.replace(/,\s*(][\s\n\r]*)/g, '$1');
-  // Trim
-  s = s.trim();
-  return s;
-}
-
-function safeParseJson(candidate) {
-  if (!candidate) return null;
+function safeParseJson(jsonStr) {
   try {
-    return JSON.parse(candidate);
-  } catch (e1) {
-    const cleaned = sanitizeJsonCandidate(candidate);
-    try {
-      return JSON.parse(cleaned);
-    } catch (e2) {
-      console.warn('🧪 optimize: JSON parse failed. Candidate preview:', cleaned.substring(0, 500));
-      throw e2;
-    }
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    console.warn('JSON parse error:', e.message);
+    return null;
   }
 }
 
-// Concurrency gate to limit parallel OpenRouter requests
+// Global AI status for provider cooldown / concurrency control
 export const AI_STATUS = {
   model: USER_FALLBACK_MODELS[0], // Use primary model from user-specified list
   last429: null,
@@ -300,11 +281,52 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
+  // Log environment info for debugging
+  console.log('🌍 Environment Debug Info:', {
+    nodeEnv: process.env.NODE_ENV,
+    vercelEnv: process.env.VERCEL_ENV,
+    hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY,
+    openRouterKeyLength: process.env.OPENROUTER_API_KEY?.length || 0,
+    hasOpenRouterModel: !!process.env.OPENROUTER_MODEL,
+    hasOpenRouterBaseUrl: !!process.env.OPENROUTER_BASE_URL,
+    corsOrigins: process.env.CORS_ORIGINS,
+    workingDirectory: process.cwd(),
+    __dirname: __dirname
+  });
+
   try {
     const { resumeText, jobDescription, options, prompt } = req.body || {};
 
     if (!resumeText || !jobDescription) {
       return res.status(400).json({ success: false, error: 'Missing resume or job description' });
+    }
+
+    // Enhanced environment variable validation
+    const requiredEnvVars = {
+      OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+      OPENROUTER_MODEL: process.env.OPENROUTER_MODEL,
+      OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL
+    };
+
+    const missingVars = Object.entries(requiredEnvVars)
+      .filter(([key, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingVars.length > 0) {
+      console.error('❌ Missing required environment variables:', missingVars);
+      console.error('🔍 Environment variables found:', {
+        hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY,
+        hasOpenRouterModel: !!process.env.OPENROUTER_MODEL,
+        hasOpenRouterBaseUrl: !!process.env.OPENROUTER_BASE_URL,
+        nodeEnv: process.env.NODE_ENV,
+        vercelEnv: process.env.VERCEL_ENV
+      });
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Service configuration incomplete',
+        details: `Missing required environment variables: ${missingVars.join(', ')}`,
+        support: 'support@fixrez.com'
+      });
     }
 
     const composePrompt = (rText, jDesc) => `Resume:\n${rText}\n\nJob Description:\n${jDesc}`;
@@ -316,12 +338,12 @@ export default async function handler(req, res) {
     const now = Date.now();
     if (AI_STATUS.cooldownUntil && now < AI_STATUS.cooldownUntil) {
       const waitMs = AI_STATUS.cooldownUntil - now;
-      res.set('Retry-After', String(Math.ceil(waitMs/1000)));
+      res.setHeader('Retry-After', String(Math.ceil(waitMs/1000)));
       return res.status(429).json({ success: false, error: 'Rate limited', details: `Provider cooldown active. Wait ~${Math.ceil(waitMs/1000)}s and retry.`, cooldownUntil: new Date(AI_STATUS.cooldownUntil).toISOString() });
     }
     if (AI_STATUS.lastCall && now - AI_STATUS.lastCall < MIN_SPACING_MS) {
       const waitMs = MIN_SPACING_MS - (now - AI_STATUS.lastCall);
-      res.set('Retry-After', String(Math.ceil(waitMs/1000)));
+      res.setHeader('Retry-After', String(Math.ceil(waitMs/1000)));
       return res.status(429).json({ success: false, error: 'Too frequent', details: `Please wait ~${Math.ceil(waitMs/1000)}s before next request.` });
     }
     AI_STATUS.lastCall = now;
@@ -329,15 +351,22 @@ export default async function handler(req, res) {
     // Prefer provided prompt; otherwise compose prompt (apply truncation)
     const composedPrompt = prompt || composePrompt(truncate(resumeText, 3000), truncate(jobDescription, 2000));
 
-    // Dev mock fallback to ensure UX during provider issues
+    // Check for API key - if missing, return proper error
     const hasKey = Boolean(process.env.OPENROUTER_API_KEY);
-    const useMock = !hasKey && (String(process.env.DEV_AI_MOCK || '').toLowerCase() === 'true');
-    const devBypass = false;
-    console.log('🧪 optimize flags:', { DEV_AI_MOCK: useMock, DEV_AUTH_BYPASS: devBypass, user: req.user?.email || 'none' })
-    if (useMock) {
-      const mock = buildMockResume(resumeText, jobDescription);
-      console.log('🧪 optimize: returning mock resume', { options })
-      return res.status(200).json({ success: true, data: mock, warning: 'Using mock due to DEV flags.' });
+    console.log('🔑 API Key Check:', { 
+      hasKey: hasKey, 
+      keyLength: process.env.OPENROUTER_API_KEY?.length || 0,
+      envLoaded: !!process.env.OPENROUTER_API_KEY 
+    });
+
+    if (!hasKey) {
+      console.error('❌ OPENROUTER_API_KEY not found in environment variables');
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Service temporarily unavailable',
+        details: 'AI optimization service is not properly configured. Please contact support.',
+        support: 'support@fixrez.com'
+      });
     }
 
     let lastError = null;
