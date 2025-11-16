@@ -10,7 +10,12 @@ export default function VerifyPage() {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [cooldownMs, setCooldownMs] = useState<number>(getResendCooldownRemaining())
-  const email = user?.email || ''
+  // Get email from user object or metadata
+  const getUserEmail = () => {
+    return user?.email || (user?.user_metadata as any)?.email || ''
+  }
+  
+  const email = getUserEmail()
 
   useEffect(() => {
     const id = setInterval(() => setCooldownMs(getResendCooldownRemaining()), 1000)
@@ -96,22 +101,33 @@ export default function VerifyPage() {
   }, [verificationStatus])
 
   const handleResend = async () => {
-    if (!email) {
-      setStatus({ type: 'error', message: 'Please sign in and provide your email to resend verification.' })
+    const userEmail = getUserEmail()
+    
+    if (!userEmail) {
+      setStatus({ type: 'error', message: 'Unable to determine your email address. Please try logging in again.' })
       return
     }
+    
     if (!canResend()) {
       const seconds = Math.ceil(getResendCooldownRemaining() / 1000)
       setStatus({ type: 'error', message: `Please wait ${seconds}s before requesting again.` })
       return
     }
+    
     setLoading(true)
     setStatus({ type: 'success', message: 'Sending verification email…' })
-    const res = await resendVerification(email)
-    setLoading(false)
-    setCooldownMs(getResendCooldownRemaining())
-    setStatus(res.success ? { type: 'success', message: res.message } : { type: 'error', message: res.message })
-    const token = (res as any).token as string | undefined
+    
+    try {
+      const res = await resendVerification(userEmail)
+      setCooldownMs(getResendCooldownRemaining())
+      setStatus(res.success ? { type: 'success', message: res.message } : { type: 'error', message: res.message })
+      const token = (res as any).token as string | undefined
+    } catch (error) {
+      console.error('Failed to resend verification:', error)
+      setStatus({ type: 'error', message: 'Failed to send verification email. Please try again.' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleGoToLogin = () => {
@@ -162,7 +178,7 @@ export default function VerifyPage() {
         {!status && (
           <div className="mb-4 rounded-lg border px-4 py-3 border-blue-300 bg-blue-50 text-blue-700">
             <span>
-              Thanks for signing up. We sent a confirmation to <span className="font-medium">{email || 'your email'}</span> from <span className="font-medium">noreply@summitpixels.com</span>.
+              {user ? 'Thanks for signing up!' : 'Thanks for signing up.'} We sent a confirmation to <span className="font-medium">{email || 'your email'}</span> from <span className="font-medium">noreply@summitpixels.com</span>.
               The link is valid for 24 hours. It may take up to 2 minutes for the email to arrive. If you don't see it, check your Spam/Junk folder.
             </span>
           </div>

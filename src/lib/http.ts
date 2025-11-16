@@ -13,5 +13,9 @@ export function getApiBase(): string {
       return `${window.location.origin}/api`.replace(/\/$/, '')
     }
   } catch {}
+  // For development environment, default to localhost
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+    return 'http://localhost:3003/api'
+  }
   return '/api'
 }

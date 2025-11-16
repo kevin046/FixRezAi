@@ -21,13 +21,14 @@ import {
   AlertTriangle,
   Info,
   Check,
-  X
+  X,
+  Key
 } from 'lucide-react'
 import { Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 import LogoutButton from '@/components/LogoutButton'
-import { isVerified, resendVerification, canResend, getResendCooldownRemaining } from '@/lib/auth'
+import { isVerified, resendVerification, canResend, getResendCooldownRemaining, sendPasswordResetEmail } from '@/lib/auth'
  
 import { useTheme } from '@/hooks/useTheme'
 import { toast } from 'sonner'
@@ -62,6 +63,7 @@ const SettingsPage: React.FC = () => {
   const [cooldownMs, setCooldownMs] = useState<number>(getResendCooldownRemaining())
   const [showSecurityDetails, setShowSecurityDetails] = useState(false)
   const [resendingEmail, setResendingEmail] = useState(false)
+  const [resettingPassword, setResettingPassword] = useState(false)
 
   // Added UI and toggle states
   const [showVerificationOverlay, setShowVerificationOverlay] = useState<boolean>(false)
@@ -136,6 +138,27 @@ const SettingsPage: React.FC = () => {
   const cooldownSeconds = Math.ceil(cooldownMs / 1000)
   const resendDisabled = cooldownMs > 0 || resendingEmail
   const resendLabel = cooldownMs > 0 ? `Resend in ${cooldownSeconds}s` : 'Resend verification email'
+
+  // Password reset handler
+  const handlePasswordReset = async () => {
+    if (!email) {
+      setStatus({ type: 'error', message: 'Please ensure you are logged in to reset your password.' })
+      toast.error('Please ensure you are logged in to reset your password.')
+      return
+    }
+
+    setResettingPassword(true)
+    const result = await sendPasswordResetEmail(email)
+    setResettingPassword(false)
+
+    if (result.success) {
+      setStatus({ type: 'success', message: result.message })
+      toast.success(result.message)
+    } else {
+      setStatus({ type: 'error', message: result.message })
+      toast.error(result.message)
+    }
+  }
 
   // Settings categories with enhanced functionality
   const settingsCategories: SettingsCategory[] = useMemo(() => [

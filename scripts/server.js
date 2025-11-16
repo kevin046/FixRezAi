@@ -8,14 +8,14 @@ import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
-import VerificationService from './services/verificationService.js';
-import VerificationServiceEnhanced from './services/verificationServiceEnhanced.js';
-import verificationMiddleware from './middleware/verification.js';
-import { analyzeATS, getAnalysisProgress, getAnalysisResults, cleanupSession } from './atsRoutes.js';
+import VerificationService from '../api/services/verificationService.js';
+import VerificationServiceEnhanced from '../api/services/verificationServiceEnhanced.js';
+import verificationMiddleware from '../api/middleware/verification.js';
+import { analyzeATS, getAnalysisProgress, getAnalysisResults, cleanupSession } from '../api/atsRoutes.js';
 
 // Import serverless-style handlers and adapt to Express
-import optimizeHandler, { AI_STATUS } from './optimize.js';
-import contactHandler from './contact.js';
+import optimizeHandler, { AI_STATUS } from '../api/optimize.js';
+import contactHandler from '../api/contact.js';
 
 // Force reset AI_STATUS to ensure clean state
 console.log('🔄 Server startup: Resetting AI_STATUS before server starts...');
@@ -527,6 +527,196 @@ app.post('/api/send-verification', ipAllowlist, rateLimiter, requireAuth, verifi
   }
 })
 
+// Unauthenticated verification resend endpoint (for login flow)
+app.post('/api/send-verification-public', ipAllowlist, rateLimiter, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
+  const { email } = req.body
+
+  if (!email) {
+    return res.status(400).json({ success: false, error: 'Email is required' })
+  }
+
+  // Basic email validation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ success: false, error: 'Please enter a valid email address' })
+  }
+
+  try {
+    console.log('📧 Attempting unauthenticated verification resend for:', email)
+    console.log('🔍 Environment check - RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'Present' : 'Missing')
+    console.log('🔍 Environment check - SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Present' : 'Missing')
+    
+    // Create Supabase client for this endpoint
+    const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!serviceKey) {
+      console.error('❌ Supabase service role key not configured')
+      return res.status(500).json({ success: false, error: 'Server not configured - missing Supabase service role key' })
+    }
+    
+    const admin = createClient(supabaseUrl, serviceKey)
+    
+    // First, find the user by email to get their user ID
+    const { data: users, error: listError } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 100  // Increased to handle more users
+    })
+
+    if (listError) {
+      console.error('❌ Error listing users:', listError)
+      return res.status(500).json({ success: false, error: 'Failed to find user account' })
+    }
+
+    // Find the specific user by email
+    const user = users.users.find(u => u.email === email)
+    
+    if (!user) {
+      console.error('❌ User not found for email:', email)
+      return res.status(404).json({ success: false, error: 'No account found with this email address' })
+    }
+
+    // Check if user is already verified
+    if (user.email_confirmed_at) {
+      console.log('✅ User already verified:', email)
+      return res.status(400).json({ success: false, error: 'This email is already verified. Please try logging in.' })
+    }
+
+    console.log('🔍 Found unverified user:', user.id, 'for email:', email)
+
+    // Generate a verification token using our verification service
+    const tokenResult = await verificationService.generateVerificationToken(
+      user.id,
+      email,
+      req.ip,
+      req.get('User-Agent')
+    )
+
+    if (!tokenResult.success) {
+      console.error('❌ Failed to generate verification token:', tokenResult.error)
+      return res.status(500).json({ success: false, error: 'Failed to generate verification token' })
+    }
+
+    console.log('✅ Verification token generated successfully for user:', user.id)
+
+    // Get the verification URL
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5176'
+    const verificationUrl = `${frontendUrl}/verify?token=${tokenResult.token}&email=${encodeURIComponent(email)}`
+
+    // Check if Resend API key is available
+    const hasResendKey = Boolean(process.env.RESEND_API_KEY)
+    
+    if (hasResendKey) {
+      // Send the verification email using Resend API (same as authenticated endpoint)
+      try {
+        console.log('📬 Sending verification email via Resend to:', email)
+        const resp = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>',
+            reply_to: process.env.RESEND_REPLY_TO || undefined,
+            to: email,
+            subject: 'Complete Your FixRez Registration',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Welcome to FixRez!</h2>
+                <p>Thank you for signing up. To complete your registration and verify your email address, please click the button below:</p>
+                <div style="margin: 30px 0;">
+                  <a href="${verificationUrl}" 
+                     style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                    Verify Email Address
+                  </a>
+                </div>
+                <p style="color: #666; font-size: 14px;">
+                  Or copy and paste this link into your browser:<br>
+                  <code style="background-color: #f4f4f4; padding: 2px 4px; border-radius: 2px;">${verificationUrl}</code>
+                </p>
+                <p style="color: #666; font-size: 14px;">
+                  This verification link will expire in 24 hours for security reasons.
+                </p>
+                <p style="color: #666; font-size: 14px;">
+                  If you didn't create this account, you can safely ignore this email.
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #999; font-size: 12px;">
+                  Best regards,<br>
+                  The FixRez Team
+                </p>
+              </div>
+            `
+          })
+        })
+        
+        const ok = resp.ok
+        let data
+        try { data = await resp.json() } catch { data = null }
+        
+        if (!ok) {
+          const details = data && (data.error || data.message) ? (data.error || data.message) : `Status ${resp.status}`
+          console.error('❌ Resend API failed:', details)
+          return res.status(502).json({ success: false, error: `Failed to send email: ${details}` })
+        }
+        
+        console.log('✅ Verification email sent successfully via Resend. Email ID:', data?.id)
+        
+      } catch (err) {
+        console.error('❌ Resend API error:', err?.message || err)
+        return res.status(502).json({ success: false, error: `Email provider error: ${err?.message || 'Unknown'}` })
+      }
+    } else {
+      // Fallback to Supabase auth resend if Resend is not configured
+      console.log('📧 Resend not configured, using Supabase auth resend for:', email)
+      try {
+        const { error } = await admin.auth.resend({
+          type: 'signup',
+          email: email,
+          options: { 
+            emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5176'}/verify` 
+          }
+        })
+
+        if (error) {
+          console.error('❌ Supabase resend error:', error)
+          
+          // Handle specific error cases
+          if (error.message.includes('User not found')) {
+            return res.status(404).json({ success: false, error: 'No account found with this email address' })
+          } else if (error.message.includes('rate limit') || error.message.includes('too many')) {
+            return res.status(429).json({ success: false, error: 'Too many requests. Please wait a few minutes before trying again.' })
+          } else if (error.message.includes('already confirmed')) {
+            return res.status(400).json({ success: false, error: 'This email is already verified. Please try logging in.' })
+          } else if (error.message.includes('Error sending confirmation email')) {
+            // Handle Supabase email configuration issues
+            console.error('❌ Supabase email service configuration issue')
+            return res.status(503).json({ 
+              success: false, 
+              error: 'Email service is temporarily unavailable. Please try again later or contact support if the issue persists.' 
+            })
+          }
+          
+          return res.status(400).json({ success: false, error: error.message })
+        }
+        
+        console.log('✅ Verification email sent successfully via Supabase to:', email)
+      } catch (err) {
+        console.error('❌ Supabase resend error:', err?.message || err)
+        return res.status(502).json({ success: false, error: `Email provider error: ${err?.message || 'Unknown'}` })
+      }
+    }
+
+    console.log('✅ Verification email sent successfully to:', email)
+    auditLog({ type: 'send_verification_public', email, ip: req.ip, ts: new Date().toISOString() })
+    
+    return res.json({ 
+      success: true, 
+      message: 'Verification email sent! Please check your inbox (and spam folder) for the verification link. Click the link to verify your email address.' 
+    })
+
+  } catch (error) {
+    console.error('Error in public send-verification:', error)
+    res.status(500).json({ success: false, error: 'Failed to send verification email. Please try again later.' })
+  }
+})
+
 // Enhanced verify email endpoint
 app.get('/api/verify', ipAllowlist, rateLimiter, verificationMiddleware.logVerificationAttempt(), async (req, res) => {
   const { token } = req.query
@@ -957,6 +1147,7 @@ app.listen(PORT, () => {
   console.log('   DELETE /api/ats/session/:sessionId');
   console.log('   GET  /api/csrf');
   console.log('   POST /api/send-verification');
+  console.log('   POST /api/send-verification-public');
   console.log('   GET  /api/verify');
   console.log('   POST /api/verification/create-token');
   console.log('   POST /api/verification/verify-token');

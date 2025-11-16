@@ -18,6 +18,8 @@ import AccessibilityPage from './pages/accessibility'
 import SecurityPage from './pages/security'
 import ATSRatingPage from './pages/ATSRatingPage'
 import SitemapPage from './pages/sitemap'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import { Toaster } from 'sonner'
 import Footer from '@/components/Footer'
 import { testApiConnectivity } from '@/lib/apiTest'
@@ -26,7 +28,7 @@ function App() {
   const { user, setUser, setVerificationStatus, logout, verificationStatus, verificationLoaded, fetchVerificationStatus } = useAuthStore()
   
   // Check URL path to determine initial view
-  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' => {
+  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword' => {
     const path = window.location.pathname
     if (path === '/optimize') return 'wizard'
     if (path === '/terms') return 'terms'
@@ -41,14 +43,16 @@ function App() {
     if (path === '/security') return 'security'
     if (path === '/sitemap') return 'sitemap'
     if (path === '/ats-rating') return 'atsRating'
+    if (path === '/forgot-password') return 'forgotPassword'
+    if (path === '/reset-password') return 'resetPassword'
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap'>(
+  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword'>(
     getInitialView()
   )
 
-  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap') => {
+  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword') => {
     if (view === 'wizard' && user && !isVerified(user)) {
       view = 'verify'
     }
@@ -71,6 +75,8 @@ function App() {
     else if (view === 'security') path = '/security'
     else if (view === 'sitemap') path = '/sitemap'
     else if (view === 'atsRating') path = '/ats-rating'
+    else if (view === 'forgotPassword') path = '/forgot-password'
+    else if (view === 'resetPassword') path = '/reset-password'
     window.history.pushState({}, '', path)
   }
 
@@ -254,6 +260,10 @@ function App() {
         return <ATSRatingPage />
       case 'sitemap':
         return <SitemapPage />
+      case 'forgotPassword':
+        return <ForgotPasswordPage />
+      case 'resetPassword':
+        return <ResetPasswordPage />
       default:
         return <Hero onGetStarted={handleGetStarted} user={user} onLogout={handleLogout} />
     }
