@@ -13,16 +13,24 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const verificationService = new VerificationService();
 
 export default async function handler(req, res) {
+  console.log('🔍 Verification Status Endpoint Called');
+  console.log('📍 URL:', req.url);
+  console.log('🔑 Has Authorization:', !!req.headers.authorization);
+  console.log('🌍 Origin:', req.headers.origin);
+  console.log('👤 User-Agent:', req.headers['user-agent']);
+  
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   if (req.method === 'OPTIONS') {
+    console.log('✅ OPTIONS request - returning 200');
     return res.status(200).end();
   }
 
   if (req.method !== 'GET') {
+    console.log('❌ Invalid method:', req.method);
     return res.status(405).json({ 
       success: false, 
       error: 'Method not allowed' 
