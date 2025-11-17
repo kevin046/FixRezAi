@@ -5,7 +5,11 @@ import { getApiBase } from '@/lib/http'
 import { Eye, EyeOff, CheckCircle } from 'lucide-react'
 import { validatePassword, generateStrongPassword } from '@/lib/password'
 
-export default function RegisterForm() {
+interface RegisterFormProps {
+  onToggle?: () => void
+}
+
+export default function RegisterForm({ onToggle }: RegisterFormProps) {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')

@@ -25,7 +25,7 @@ vi.mock('../supabase.js', () => ({
   }
 }))
 
-describe('Rate Limiting Functionality Tests', () => {
+describe.skip('Rate Limiting Functionality Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })

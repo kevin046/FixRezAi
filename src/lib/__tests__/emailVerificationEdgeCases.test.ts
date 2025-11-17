@@ -46,10 +46,11 @@ describe('Email Verification Edge Cases', () => {
       ]
 
       for (const email of specialEmails) {
-        const token = await generateRegistrationVerificationToken(email)
-        expect(token).toBeDefined()
-        expect(token.length).toBeGreaterThan(32)
-        expect(token).toMatch(/^[A-Za-z0-9_-]+$/)
+        const result = await generateRegistrationVerificationToken('test-user-123', email)
+        expect(result.success).toBe(true)
+        expect(result.token).toBeDefined()
+        expect(result.token!.length).toBeGreaterThan(32)
+        expect(result.token).toMatch(/^[A-Za-z0-9_-]+$/)
       }
     })
 
@@ -65,7 +66,7 @@ describe('Email Verification Edge Cases', () => {
       for (const token of malformedTokens) {
         const result = await completeRegistrationVerification('test@example.com', token)
         expect(result.success).toBe(false)
-        expect(result.error).toContain('Invalid token format')
+        expect(result.message).toContain('Invalid token format')
       }
     })
   })
@@ -101,7 +102,7 @@ describe('Email Verification Edge Cases', () => {
       
       const result = await resendRegistrationVerification(email)
       expect(result.success).toBe(false)
-      expect(result.error).toContain('Rate limit exceeded')
+      expect(result.message).toContain('Rate limit exceeded')
     })
   })
 

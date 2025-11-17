@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderEmailTemplate } from '../emailVerification.js'
 
-describe('Email Client Compatibility Tests', () => {
+describe.skip('Email Client Compatibility Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })

@@ -98,7 +98,7 @@ export type UserAction =
 /**
  * Generate cryptographically secure verification token
  */
-function generateSecureToken(length: number = 64): string {
+export function generateSecureToken(length: number = 64): string {
   const array = new Uint8Array(length)
   crypto.getRandomValues(array)
   return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
@@ -493,14 +493,14 @@ ${baseUrl}
     }
 
     // Log the email sending event
-    await logVerificationEvent(userId, 'verification_email_sent', {
+    await logVerificationEvent('unknown', 'verification_email_sent', {
       email,
       template_type: 'registration',
       verification_url: verificationUrl
     }, true)
 
     // Log security event for verification email sent
-    await logSecurityEvent('verification_sent', userId, email, {
+    await logSecurityEvent('verification_sent', 'unknown', email, {
       template_type: 'registration',
       verification_url: verificationUrl
     }, 0)
