@@ -49,55 +49,54 @@ export async function resendVerification(email: string): Promise<{ success: bool
 
     resendInFlight = true
 
-    // Get the API base URL
-    const getApiBase = () => {
-      if (typeof window !== 'undefined') {
-        const host = window.location.hostname
-        const isLocal = host === 'localhost' || host === '127.0.0.1'
-        if (isLocal) return 'http://localhost:3003/api'
-        return `${window.location.origin}/api`.replace(/\/$/, '')
+    // Use the approach that works - resend method with better error handling
+    try {
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : 'https://fixrez.com'}/verify`
+        }
+      })
+      
+      if (resendError) {
+        // Handle specific email sending errors
+        if (resendError.message.toLowerCase().includes('error sending confirmation email')) {
+          console.warn('Email service configuration issue detected')
+          // Return a user-friendly message for email service issues
+          return { 
+            success: false, 
+            message: 'Email service is temporarily unavailable. Please try again later or contact support if the issue persists.' 
+          }
+        }
+        throw resendError
       }
-      return 'https://fixrez.com/api'
+      
+      try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
+      return { success: true, message: 'Verification email sent! Please check your inbox and complete the registration process.' }
+      
+    } catch (error) {
+      console.error('Resend verification failed:', error)
+      throw error
     }
-
-    const apiBase = getApiBase()
     
-    // Use the server endpoint that has Resend integration
-    const response = await fetch(`${apiBase}/send-verification-public`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email })
-    })
-
-    const result = await response.json()
-    
-    if (!response.ok || !result.success) {
-      const error = result.error || result.message || 'Failed to send verification email'
-      
-      // Handle specific error cases
-      if (error.toLowerCase().includes('too many') || error.toLowerCase().includes('rate')) {
-        try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
-        return { success: false, message: 'Too many requests. Please wait a few minutes and try again.' }
-      }
-      
-      if (error.toLowerCase().includes('already verified')) {
-        return { success: false, message: 'This email is already verified. Please try logging in.' }
-      }
-      
-      if (error.toLowerCase().includes('not found')) {
-        return { success: false, message: 'No account found with this email address.' }
-      }
-      
-      return { success: false, message: error }
-    }
-
-    try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
-    return { success: true, message: result.message || 'Verification email sent! Check your inbox (and spam folder).' }
   } catch (e) {
     console.error('Resend verification error:', e)
-    return { success: false, message: e instanceof Error ? e.message : 'Failed to resend verification email. Please try again.' }
+    const errorMessage = e instanceof Error ? e.message : 'Failed to resend verification email.'
+    
+    // Handle specific Supabase errors
+    if (errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('too many')) {
+      try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
+      return { success: false, message: 'Too many requests. Please wait a few minutes before trying again.' }
+    } else if (errorMessage.toLowerCase().includes('user not found')) {
+      return { success: false, message: 'No account found with this email address. Please register first.' }
+    } else if (errorMessage.toLowerCase().includes('already confirmed')) {
+      return { success: false, message: 'This email is already verified. Please try logging in.' }
+    } else if (errorMessage.toLowerCase().includes('hook') && errorMessage.toLowerCase().includes('405')) {
+      return { success: false, message: 'Email service is temporarily unavailable. Please try again later or contact support.' }
+    }
+    
+    return { success: false, message: errorMessage }
   } finally {
     resendInFlight = false
   }

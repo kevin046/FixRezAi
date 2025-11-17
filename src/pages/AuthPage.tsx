@@ -76,7 +76,7 @@ export default function AuthPage() {
 
               <div className="space-y-6">
                 {mode === 'login' ? (
-                  <LoginForm />
+                  <LoginForm onToggle={() => setMode('register')} />
                 ) : (
                   <RegisterForm onToggle={() => setMode('login')} />
                 )}

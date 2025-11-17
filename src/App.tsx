@@ -23,6 +23,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import { Toaster } from 'sonner'
 import Footer from '@/components/Footer'
 import { testApiConnectivity } from '@/lib/apiTest'
+import UnverifiedUserNotification from '@/components/UnverifiedUserNotification'
 
 function App() {
   const { user, setUser, setVerificationStatus, logout, verificationStatus, verificationLoaded, fetchVerificationStatus } = useAuthStore()
@@ -271,6 +272,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
+      {/* Global Unverified User Notification */}
+      {user && !isVerified(user) && currentView !== 'verify' && <UnverifiedUserNotification />}
+      
       <div className="flex-1">
         {renderView()}
       </div>

@@ -32,6 +32,7 @@ import { isVerified, resendVerification, canResend, getResendCooldownRemaining, 
  
 import { useTheme } from '@/hooks/useTheme'
 import { toast } from 'sonner'
+import VerificationStatusBadge from '@/components/VerificationStatusBadge'
 
 interface SettingsCategory {
   id: string
@@ -487,30 +488,29 @@ const SettingsPage: React.FC = () => {
           <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Shield className={`w-5 h-5 text-${securityStatus.color}-600 dark:text-${securityStatus.color}-400`} />
+                <Shield className={`w-5 h-5 ${securityStatus.color === 'green' ? 'text-green-600 dark:text-green-400' : securityStatus.color === 'red' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`} />
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white">Security Status</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-300">{securityStatus.message}</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowSecurityDetails(!showSecurityDetails)}
-                className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-              >
-                {showSecurityDetails ? 'Hide Details' : 'View Details'}
-              </button>
+              <div className="flex items-center gap-3">
+                <VerificationStatusBadge compact={true} />
+                <button
+                  onClick={() => setShowSecurityDetails(!showSecurityDetails)}
+                  className="px-3 py-1 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                >
+                  {showSecurityDetails ? 'Hide Details' : 'View Details'}
+                </button>
+              </div>
             </div>
 
             {/* Detailed Security Information */}
             {showSecurityDetails && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 space-y-4">
+                <VerificationStatusBadge showDetails={true} />
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    {verified ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
-                    <span className={verified ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                      Email Verification: {verified ? 'Verified' : 'Not Verified'}
-                    </span>
-                  </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <span className="text-green-600 dark:text-green-400">Account Status: Active</span>
@@ -521,7 +521,7 @@ const SettingsPage: React.FC = () => {
                       Member Since: {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 md:col-span-2">
                     <Mail className="w-4 h-4 text-gray-600" />
                     <span className="text-gray-600 dark:text-gray-400">Email: {email || 'Not provided'}</span>
                   </div>

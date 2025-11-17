@@ -378,7 +378,7 @@ app.get('/api/me', ipAllowlist, rateLimiter, requireVerified, async (req, res) =
 // JWT email verification workflow
 const VERIFY_SECRET = process.env.VERIFICATION_JWT_SECRET || (process.env.SUPABASE_SERVICE_ROLE_KEY ? crypto.createHash('sha256').update(String(process.env.SUPABASE_SERVICE_ROLE_KEY)).digest('hex') : crypto.randomBytes(32).toString('hex'))
 const TOKEN_TTL_SECONDS = Number(process.env.VERIFICATION_TOKEN_TTL_SECONDS || 24 * 60 * 60)
-const WEBSITE_URL = process.env.WEBSITE_URL || 'http://localhost:5173'
+const WEBSITE_URL = process.env.FRONTEND_URL || process.env.WEBSITE_URL || 'http://localhost:5174'
 const SUCCESS_REDIRECT_URL = process.env.SUCCESS_REDIRECT_URL || `${WEBSITE_URL}/?verify=success`
 const FAILURE_REDIRECT_URL = process.env.FAILURE_REDIRECT_URL || `${WEBSITE_URL}/verify?error=invalid`
 
@@ -395,77 +395,6 @@ app.post('/api/send-verification', ipAllowlist, rateLimiter, requireAuth, verifi
   }
 
   try {
-    // Prefer Resend if API key is available (more reliable than Supabase resend)
-    const hasResendKey = Boolean(process.env.RESEND_API_KEY)
-    const providerPref = String(process.env.EMAIL_PROVIDER || (hasResendKey ? 'resend' : 'supabase')).toLowerCase()
-    const useResend = providerPref === 'resend' || hasResendKey
-
-    if (useResend && hasResendKey) {
-      console.log('📧 Using Resend API to send verification email to:', email)
-      const tokenResult = await verificationService.generateVerificationToken(
-        user.id,
-        email,
-        req.ip,
-        req.get('User-Agent')
-      )
-
-      if (!tokenResult.success) {
-        console.error('❌ Failed to generate verification token:', tokenResult.error)
-        return res.status(400).json({ success: false, error: tokenResult.error })
-      }
-
-      const verificationUrl = `${WEBSITE_URL}/verify?token=${tokenResult.token}`
-      try {
-        console.log('📬 Sending email via Resend to:', email)
-        const resp = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>',
-            reply_to: process.env.RESEND_REPLY_TO || undefined,
-            to: email,
-            subject: 'Verify your FixRez AI account',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">Verify your FixRez AI account</h2>
-                <p>Please click the button below to verify your email address and activate your account:</p>
-                <div style="margin: 30px 0;">
-                  <a href="${verificationUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                    Verify Email Address
-                  </a>
-                </div>
-                <p style="color: #666; font-size: 14px;">
-                  This verification link will expire in 24 hours. If you didn't request this verification, please ignore this email.
-                </p>
-                <p style="color: #666; font-size: 14px;">
-                  If the button doesn't work, copy and paste this link into your browser:<br>
-                  <code style="background-color: #f4f4f4; padding: 2px 4px; border-radius: 3px;">${verificationUrl}</code>
-                </p>
-              </div>
-            `
-          })
-        })
-        const ok = resp.ok
-        let data
-        try { data = await resp.json() } catch { data = null }
-        if (!ok) {
-          const details = data && (data.error || data.message) ? (data.error || data.message) : `Status ${resp.status}`
-          console.error('❌ Resend API failed:', details)
-          auditLog({ type: 'send_verification_fail', email, userId: user.id, ts: new Date().toISOString(), details })
-          return res.status(502).json({ success: false, error: `Failed to send email: ${details}` })
-        }
-        console.log('✅ Email sent successfully via Resend. Email ID:', data?.id)
-        auditLog({ type: 'send_verification', email, userId: user.id, ts: new Date().toISOString(), provider: 'resend', id: data?.id || null })
-
-        return res.json({ success: true, message: 'Verification email sent successfully via Resend' })
-      } catch (err) {
-        console.error('❌ Resend API error:', err?.message || err)
-        auditLog({ type: 'send_verification_error', email, userId: user.id, ts: new Date().toISOString(), error: err?.message || 'Unknown' })
-        return res.status(502).json({ success: false, error: `Email provider error: ${err?.message || 'Unknown'}` })
-      }
-    }
-
-    // Fallback to Supabase (less reliable - may not send if email already confirmed)
     console.log('📧 Using Supabase admin client to resend verification email to:', email)
     const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -485,35 +414,6 @@ app.post('/api/send-verification', ipAllowlist, rateLimiter, requireAuth, verifi
       const details = resendErr.message || 'Unknown Supabase error'
       console.error('❌ Supabase resend error:', details)
       auditLog({ type: 'send_verification_fail_supabase', email, userId: user.id, ts: new Date().toISOString(), details })
-      
-      // If Supabase fails and Resend is available, try Resend as fallback
-      if (hasResendKey) {
-        console.log('🔄 Supabase failed, falling back to Resend...')
-        // Recursively call Resend logic (but prevent infinite loop)
-        const tokenResult = await verificationService.generateVerificationToken(user.id, email, req.ip, req.get('User-Agent'))
-        if (tokenResult.success) {
-          const verificationUrl = `${WEBSITE_URL}/verify?token=${tokenResult.token}`
-          try {
-            const resp = await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                from: process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>',
-                to: email,
-                subject: 'Verify your FixRez AI account',
-                html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"><h2>Verify your FixRez AI account</h2><p>Click <a href="${verificationUrl}">here</a> to verify your email.</p><p>Or copy this link: ${verificationUrl}</p></div>`
-              })
-            })
-            if (resp.ok) {
-              console.log('✅ Fallback to Resend succeeded')
-              return res.json({ success: true, message: 'Verification email sent successfully via Resend (fallback)' })
-            }
-          } catch (e) {
-            console.error('❌ Resend fallback also failed:', e)
-          }
-        }
-      }
-      
       return res.status(502).json({ success: false, error: `Supabase email error: ${details}` })
     }
     
@@ -604,103 +504,30 @@ app.post('/api/send-verification-public', ipAllowlist, rateLimiter, verification
     // Check if Resend API key is available
     const hasResendKey = Boolean(process.env.RESEND_API_KEY)
     
-    if (hasResendKey) {
-      // Send the verification email using Resend API (same as authenticated endpoint)
-      try {
-        console.log('📬 Sending verification email via Resend to:', email)
-        const resp = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>',
-            reply_to: process.env.RESEND_REPLY_TO || undefined,
-            to: email,
-            subject: 'Complete Your FixRez Registration',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">Welcome to FixRez!</h2>
-                <p>Thank you for signing up. To complete your registration and verify your email address, please click the button below:</p>
-                <div style="margin: 30px 0;">
-                  <a href="${verificationUrl}" 
-                     style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                    Verify Email Address
-                  </a>
-                </div>
-                <p style="color: #666; font-size: 14px;">
-                  Or copy and paste this link into your browser:<br>
-                  <code style="background-color: #f4f4f4; padding: 2px 4px; border-radius: 2px;">${verificationUrl}</code>
-                </p>
-                <p style="color: #666; font-size: 14px;">
-                  This verification link will expire in 24 hours for security reasons.
-                </p>
-                <p style="color: #666; font-size: 14px;">
-                  If you didn't create this account, you can safely ignore this email.
-                </p>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="color: #999; font-size: 12px;">
-                  Best regards,<br>
-                  The FixRez Team
-                </p>
-              </div>
-            `
-          })
-        })
-        
-        const ok = resp.ok
-        let data
-        try { data = await resp.json() } catch { data = null }
-        
-        if (!ok) {
-          const details = data && (data.error || data.message) ? (data.error || data.message) : `Status ${resp.status}`
-          console.error('❌ Resend API failed:', details)
-          return res.status(502).json({ success: false, error: `Failed to send email: ${details}` })
+    try {
+      const { error } = await admin.auth.resend({
+        type: 'signup',
+        email: email,
+        options: { 
+          emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/verify` 
         }
-        
-        console.log('✅ Verification email sent successfully via Resend. Email ID:', data?.id)
-        
-      } catch (err) {
-        console.error('❌ Resend API error:', err?.message || err)
-        return res.status(502).json({ success: false, error: `Email provider error: ${err?.message || 'Unknown'}` })
-      }
-    } else {
-      // Fallback to Supabase auth resend if Resend is not configured
-      console.log('📧 Resend not configured, using Supabase auth resend for:', email)
-      try {
-        const { error } = await admin.auth.resend({
-          type: 'signup',
-          email: email,
-          options: { 
-            emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5176'}/verify` 
-          }
-        })
-
-        if (error) {
-          console.error('❌ Supabase resend error:', error)
-          
-          // Handle specific error cases
-          if (error.message.includes('User not found')) {
-            return res.status(404).json({ success: false, error: 'No account found with this email address' })
-          } else if (error.message.includes('rate limit') || error.message.includes('too many')) {
-            return res.status(429).json({ success: false, error: 'Too many requests. Please wait a few minutes before trying again.' })
-          } else if (error.message.includes('already confirmed')) {
-            return res.status(400).json({ success: false, error: 'This email is already verified. Please try logging in.' })
-          } else if (error.message.includes('Error sending confirmation email')) {
-            // Handle Supabase email configuration issues
-            console.error('❌ Supabase email service configuration issue')
-            return res.status(503).json({ 
-              success: false, 
-              error: 'Email service is temporarily unavailable. Please try again later or contact support if the issue persists.' 
-            })
-          }
-          
-          return res.status(400).json({ success: false, error: error.message })
+      })
+      if (error) {
+        if (error.message.includes('User not found')) {
+          return res.status(404).json({ success: false, error: 'No account found with this email address' })
+        } else if (error.message.includes('rate limit') || error.message.includes('too many')) {
+          return res.status(429).json({ success: false, error: 'Too many requests. Please wait a few minutes before trying again.' })
+        } else if (error.message.includes('already confirmed')) {
+          return res.status(400).json({ success: false, error: 'This email is already verified. Please try logging in.' })
+        } else if (error.message.includes('Error sending confirmation email')) {
+          return res.status(503).json({ success: false, error: 'Email service is temporarily unavailable.' })
         }
-        
-        console.log('✅ Verification email sent successfully via Supabase to:', email)
-      } catch (err) {
-        console.error('❌ Supabase resend error:', err?.message || err)
-        return res.status(502).json({ success: false, error: `Email provider error: ${err?.message || 'Unknown'}` })
+        return res.status(400).json({ success: false, error: error.message })
       }
+      console.log('✅ Verification email sent successfully via Supabase to:', email)
+    } catch (err) {
+      console.error('❌ Supabase resend error:', err?.message || err)
+      return res.status(502).json({ success: false, error: `Email provider error: ${err?.message || 'Unknown'}` })
     }
 
     console.log('✅ Verification email sent successfully to:', email)
@@ -1122,6 +949,9 @@ app.post('/api/auth/reauth-link', ipAllowlist, rateLimiter, requireAuth, async (
     res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
+
+// Unauthenticated signup helper: generate Supabase signup link and send via Resend
+// Removed /api/auth/signup route to ensure Supabase-only email flows
 
 // API routes
 app.post('/api/optimize', ipAllowlist, rateLimiter, requireVerified, wrap(optimizeHandler));

@@ -40,6 +40,7 @@ import { User } from '@supabase/supabase-js'
 import { useAuthStore } from '@/stores/authStore'
 import { isVerified } from '@/lib/auth'
 import { useResumeStore } from '@/stores/resumeStore'
+import VerificationGate from '@/components/VerificationGate'
 
 interface HeroProps {
   onGetStarted: () => void
@@ -200,13 +201,15 @@ export const Hero = ({ onGetStarted, user, onLogout }: HeroProps) => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4 mb-12 sm:mb-16 w-full px-2">
-            <button 
-              onClick={onGetStarted}
-              className="w-full sm:w-auto px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition inline-flex items-center justify-center"
-            >
-              Start Optimizing
-              <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2" />
-            </button>
+            <VerificationGate featureName="Resume Optimization">
+              <button 
+                onClick={onGetStarted}
+                className="w-full sm:w-auto px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition inline-flex items-center justify-center"
+              >
+                Start Optimizing
+                <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2" />
+              </button>
+            </VerificationGate>
           </div>
           
           {/* Live Counter */}

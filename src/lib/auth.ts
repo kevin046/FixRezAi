@@ -36,100 +36,43 @@ export function canResend(): boolean {
   return getResendCooldownRemaining() <= 0 && !resendInFlight
 }
 
-export async function resendVerification(email?: string): Promise<{ success: boolean; message: string; token?: string }> {
-  // Try to get email from current user if not provided
-  let targetEmail = email
-  
-  if (!targetEmail) {
-    const { data: { user } } = await supabase.auth.getUser()
-    targetEmail = user?.email || (user?.user_metadata as any)?.email
-    
-    if (!targetEmail) {
-      return { success: false, message: 'Unable to determine your email address. Please ensure you are logged in.' }
-    }
-  }
-  
-  if (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
-    return { success: false, message: 'Please enter a valid email address.' }
-  }
-
+export async function resendVerification(email?: string): Promise<{ success: boolean; message: string; attempts_remaining?: number }> {
   try {
-    console.log('🔄 Resend verification requested for:', targetEmail)
-    const remaining = getResendCooldownRemaining()
-    if (remaining > 0) {
-      const seconds = Math.ceil(remaining / 1000)
-      return { success: false, message: `Please wait ${seconds}s before requesting again.` }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { success: false, message: 'Please enter a valid email address.' }
     }
-    if (resendInFlight) {
-      return { success: false, message: 'A resend request is already in progress. Please wait…' }
-    }
-
-    resendInFlight = true
-
-    const { error: reauthErr } = await supabase.auth.reauthenticate()
-    if (!reauthErr) {
-      try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
-      return { success: true, message: 'Verification email sent. Check your inbox.' }
-    }
-
-    // Get the current session for authentication (if available)
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
-
-    // If no token, we can still try to resend verification for unauthenticated users
-    if (!token) {
-      console.warn('⚠️ No session token found - attempting unauthenticated verification resend')
-    }
-
-    console.log('📧 Calling backend API to resend verification email for:', targetEmail)
-    const apiBase = getApiBase()
-    const resp = await fetch(`${apiBase.replace(/\/$/, '')}/send-verification`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify({ email: targetEmail })
+    
+    // Use Supabase's built-in auth.resend() directly from the client
+    const redirectTo = `${window.location.origin}/verify?type=signup`
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email,
+      options: { emailRedirectTo: redirectTo }
     })
-
-    let payload: any = null
-    try { 
-      payload = await resp.json() 
-    } catch (e) {
-      console.error('❌ Failed to parse response:', e)
-    }
-
-    if (!resp.ok || !payload?.success) {
-      const errorMsg = payload?.error || payload?.message || resp.statusText || 'Failed to send verification email'
-      console.error('❌ Backend API error:', errorMsg)
-      console.error('Response status:', resp.status)
-      console.error('Response payload:', payload)
+    
+    if (error) {
+      let errorMessage = error.message
       
-      // Provide more helpful error messages
-      let errorMessage = errorMsg
-      if (errorMsg.includes('not found') || errorMsg.includes('User not found')) {
-        errorMessage = 'No account found with this email address. Please sign up first.'
-      } else if (errorMsg.includes('already verified') || errorMsg.includes('verified')) {
-        errorMessage = 'This email is already verified.'
-      } else if (errorMsg.includes('rate limit') || errorMsg.includes('too many')) {
+      if (error.message.includes('User not found')) {
+        errorMessage = 'No account found with this email address.'
+      } else if (error.message.includes('rate limit') || error.message.includes('too many')) {
         errorMessage = 'Too many requests. Please wait a few minutes before trying again.'
-      } else if (errorMsg.includes('not configured') || errorMsg.includes('Server not configured')) {
-        errorMessage = 'Email service is not configured. Please contact support.'
+      } else if (error.message.includes('already confirmed')) {
+        errorMessage = 'This email is already verified. Please try logging in.'
+      } else if (error.message.includes('Error sending confirmation email')) {
+        errorMessage = 'Email service is temporarily unavailable.'
       }
       
       return { success: false, message: errorMessage }
     }
-
-    // Success - update cooldown
-    try { localStorage.setItem(RESEND_KEY, String(Date.now())) } catch {}
-    console.log('✅ Verification email sent successfully to:', targetEmail)
-    console.log('📬 Response:', payload)
-    return { success: true, message: payload?.message || `Verification email sent successfully to ${targetEmail}! Please check your inbox (and spam folder) for the verification link. Click the link to verify your email address.` }
+    
+    return { 
+      success: true, 
+      message: 'Verification email sent! Please check your inbox (and spam folder) for the verification link.'
+    }
   } catch (e) {
-    console.error('❌ Resend verification exception:', e)
-    return { success: false, message: e instanceof Error ? e.message : 'Failed to resend verification email.' }
-  } finally {
-    resendInFlight = false
+    console.error('Resend verification error:', e)
+    return { success: false, message: 'Failed to send verification email. Please try again.' }
   }
 }
 

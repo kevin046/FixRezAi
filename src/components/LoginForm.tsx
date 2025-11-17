@@ -18,6 +18,7 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
   const [showResendOption, setShowResendOption] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
   const [resendSuccess, setResendSuccess] = useState('')
+  const [resendAttemptsRemaining, setResendAttemptsRemaining] = useState<number | undefined>()
   const { setUser } = useAuthStore()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -28,25 +29,30 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
     try {
       // Basic client-side validation
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailPattern.test(email)) {
+      if (!email || !emailPattern.test(email)) {
         setError('Please enter a valid email address.')
         return
       }
-      if (!password || password.length < 1) {
-        setError('Please enter your password.')
+      if (!password || password.length < 6) {
+        setError('Password must be at least 6 characters.')
         return
       }
 
       setLoading(true)
-      const { data, error } = await supabase.auth.signInWithPassword({
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) throw error
-      if (!data.user) {
-        throw new Error('Login failed. Please try again.')
+      if (signInError) {
+        throw signInError
       }
+
+      if (!data.user) {
+        throw new Error('No user data returned')
+      }
+
       setUser(data.user)
 
       // If not verified, show resend option instead of redirecting
@@ -81,6 +87,44 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
   }
 
   const handleResendVerification = async () => {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailPattern.test(email)) {
+      setError('Please enter a valid email address first.')
+      return
+    }
+
+    setResendLoading(true)
+    setResendSuccess('')
+    setError('')
+    setResendAttemptsRemaining(undefined)
+
+    try {
+      const result = await resendVerification(email)
+      if (result.success) {
+        setResendSuccess(result.message)
+        setShowResendOption(false)
+        if (result.attempts_remaining !== undefined) {
+          setResendAttemptsRemaining(result.attempts_remaining)
+        }
+        return
+      }
+      const msg = (result.message || '').toLowerCase()
+      if (msg.includes('no account found')) {
+        setError('No account found with this email address. Would you like to register for a new account?')
+        setShowResendOption(true)
+      } else {
+        setError(result.message)
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send verification email.'
+      setError(errorMessage)
+    } finally {
+      setResendLoading(false)
+    }
+  }
+
+  // OPTION 2: Alternative approach - for authenticated users only
+  const handleResendVerificationReauthenticate = async () => {
     if (!email) {
       setError('Please enter your email address first.')
       return
@@ -91,27 +135,27 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
     setError('')
     
     try {
-      // Since the user is not logged in, use the public endpoint
-      const apiBase = getApiBase()
-      const resp = await fetch(`${apiBase.replace(/\/$/, '')}/send-verification-public`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email })
-      })
-
-      const result = await resp.json()
+      // This requires the user to be authenticated
+      const { data: { session } } = await supabase.auth.getSession()
       
-      if (result.success) {
-        setResendSuccess(result.message || 'Verification email sent! Please check your inbox.')
-        setShowResendOption(false)
-      } else {
-        setError(result.error || result.message || 'Failed to send verification email.')
+      if (!session) {
+        setError('You must be logged in to use this feature.')
+        return
       }
+
+      // Use Supabase's reauthenticate method
+      const { error: reauthError } = await supabase.auth.reauthenticate()
+      
+      if (reauthError) {
+        throw reauthError
+      }
+      
+      setResendSuccess('Verification email sent! Please check your inbox.')
+      setShowResendOption(false)
     } catch (err) {
       console.error('Failed to send verification email:', err)
-      setError('Failed to send verification email. Please try again.')
+      const msg = err instanceof Error ? err.message : 'Failed to send verification email.'
+      setError(msg)
     } finally {
       setResendLoading(false)
     }
@@ -122,72 +166,76 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
       <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Sign In</h2>
 
       {error && (
-        <div
-          id="login-error"
-          role="alert"
-          aria-live="polite"
-          className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
-        >
+        <div className="mb-4 p-3 text-sm text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-lg">
           {error}
+          {error.toLowerCase().includes('no account found') && (
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => onToggle?.()}
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium underline"
+              >
+                Click here to register for a new account
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {resendSuccess && (
-        <div
-          id="resend-success"
-          role="alert"
-          aria-live="polite"
-          className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4"
-        >
+        <div className="mb-4 p-3 text-sm text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-lg">
           {resendSuccess}
         </div>
       )}
 
-      <form onSubmit={handleLogin} className="space-y-4" aria-label="Login form">
-        <div className="space-y-2">
-          <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="email">
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Email
           </label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Mail className="h-5 w-5 text-gray-400" />
+            </div>
             <input
               id="email"
+              name="email"
               type="email"
+              autoComplete="email"
+              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 pl-10 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="your@email.com"
-              aria-describedby="login-error"
-              required
+              className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              placeholder="you@example.com"
             />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="password">
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Password
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-gray-400" />
+            </div>
             <input
               id="password"
+              name="password"
               type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 pl-10 pr-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
               placeholder="••••••••"
-              aria-required="true"
-              aria-describedby="login-error"
-              required
             />
             <button
               type="button"
-              onClick={() => setShowPassword((s) => !s)}
-              className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              aria-pressed={showPassword}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              onClick={() => setShowPassword(!showPassword)}
             >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPassword ? <EyeOff className="h-5 w-5 text-gray-400" /> : <Eye className="h-5 w-5 text-gray-400" />}
             </button>
           </div>
           <div className="text-center">
@@ -211,22 +259,56 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
 
         {showResendOption && (
           <div className="space-y-2">
-            <button
-              type="button"
-              onClick={handleResendVerification}
-              disabled={resendLoading}
-              className="w-full py-2 rounded-xl text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition inline-flex items-center justify-center"
-            >
-              {resendLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              {resendLoading ? 'Sending...' : 'Resend verification email'}
-            </button>
-            <button
-              type="button"
-              onClick={handleClearResendOption}
-              className="w-full py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition"
-            >
-              Try a different email or password
-            </button>
+            {error && error.toLowerCase().includes('no account found') ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => onToggle?.()}
+                  className="w-full py-2 rounded-xl text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 transition inline-flex items-center justify-center"
+                >
+                  Register for a new account
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearResendOption}
+                  className="w-full py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition"
+                >
+                  Try a different email
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleResendVerification} // Use the current approach (RECOMMENDED)
+                  disabled={resendLoading}
+                  className="w-full py-2 rounded-xl text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition inline-flex items-center justify-center"
+                >
+                  {resendLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  {resendLoading ? 'Sending...' : 'Resend verification email'}
+                </button>
+                
+                {resendAttemptsRemaining !== undefined && resendAttemptsRemaining > 0 && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    {resendAttemptsRemaining} verification attempt{resendAttemptsRemaining !== 1 ? 's' : ''} remaining
+                  </div>
+                )}
+                
+                {resendAttemptsRemaining === 0 && (
+                  <div className="text-xs text-red-500 dark:text-red-400 text-center">
+                    No verification attempts remaining. Please contact support.
+                  </div>
+                )}
+                
+                <button
+                  type="button"
+                  onClick={handleClearResendOption}
+                  className="w-full py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition"
+                >
+                  Try a different email or password
+                </button>
+              </>
+            )}
           </div>
         )}
 

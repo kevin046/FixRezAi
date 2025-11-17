@@ -10,6 +10,9 @@ import { useAuthStore } from '@/stores/authStore'
 import { isVerified } from '@/lib/auth'
 import { useResumeStore } from '@/stores/resumeStore'
 import { calculateATSScore, ATSScore } from '@/lib/atsScoring'
+import UnverifiedUserNotification from '@/components/UnverifiedUserNotification'
+import VerificationGate from '@/components/VerificationGate'
+import VerificationStatusBadge from '@/components/VerificationStatusBadge'
  
 
 export default function DashboardPage() {
@@ -114,6 +117,9 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Unverified User Notification */}
+      {user && !verified && <UnverifiedUserNotification />}
+      
       {/* Navigation Bar (from index) */}
       <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4">
@@ -177,11 +183,16 @@ export default function DashboardPage() {
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Your Dashboard</h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Your Dashboard</h1>
+                <VerificationStatusBadge compact={true} />
+              </div>
               <p className="text-gray-600 dark:text-gray-300">Track your optimizations, exports, and ATS performance</p>
             </div>
             <div className="flex gap-2">
-              <Button onClick={navigateToWizard} className="bg-gradient-to-r from-blue-600 to-purple-600">Optimize Resume</Button>
+              <VerificationGate featureName="Resume Optimization">
+                <Button onClick={navigateToWizard} className="bg-gradient-to-r from-blue-600 to-purple-600">Optimize Resume</Button>
+              </VerificationGate>
               <a href="/contact" className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition">Contact</a>
             </div>
           </div>

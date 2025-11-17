@@ -1,46 +1,26 @@
 import { useState } from 'react'
-import { Mail, Lock, Eye, EyeOff, Loader2, CheckCircle, Wand2, Clipboard } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getApiBase } from '@/lib/http'
 import { useAuthStore } from '@/stores/authStore'
+import { getApiBase } from '@/lib/http'
+import { Eye, EyeOff, CheckCircle } from 'lucide-react'
 import { validatePassword, generateStrongPassword } from '@/lib/password'
-import { Progress } from './ui/progress'
 
-interface RegisterFormProps {
-  onToggle: () => void
-}
-
-function strengthToColors(strength: string) {
-  switch (strength) {
-    case 'weak':
-      return { bar: 'bg-red-500', text: 'text-red-600' }
-    case 'medium':
-      return { bar: 'bg-orange-500', text: 'text-orange-600' }
-    case 'strong':
-      return { bar: 'bg-green-500', text: 'text-green-600' }
-    case 'very strong':
-      return { bar: 'bg-emerald-500', text: 'text-emerald-600' }
-    default:
-      return { bar: 'bg-gray-400', text: 'text-gray-600' }
-  }
-}
-
-
-export default function RegisterForm({ onToggle }: RegisterFormProps) {
+export default function RegisterForm() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [copied, setCopied] = useState(false)
   const { setUser } = useAuthStore()
 
-  const pwdValidation = validatePassword(password, { requireSpecial: false, minLength: 8 })
-  const colors = strengthToColors(pwdValidation.strength)
+  // Email validation pattern
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,7 +32,6 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
       setError('Please enter your first and last name.')
       return
     }
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailPattern.test(email)) {
       setError('Please enter a valid email address.')
       return
@@ -74,34 +53,44 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
 
     try {
       setLoading(true)
-      const redirectTo = `${window.location.origin}/verify`
+      const redirectTo = `${window.location.origin}/verify?type=signup`
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: { emailRedirectTo: redirectTo, data: { first_name: firstName.trim(), last_name: lastName.trim(), full_name: `${firstName.trim()} ${lastName.trim()}` } },
       })
-      if (error) throw error
+      if (error) {
+        const msg = (error.message || '').toLowerCase()
+        if (msg.includes('error sending confirmation email')) {
+          if (data?.user) setUser(data.user)
+          try {
+            const { error: resendError } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${window.location.origin}/verify?type=signup` } })
+            if (!resendError) {
+              window.location.assign('/verify?sent=1&provider=supabase')
+              return
+            }
+          } catch {}
+          setError('Email service is temporarily unavailable. Please try again later.')
+          return
+        }
+        throw error
+      }
       if (!data.user) throw new Error('Registration failed. Please try again.')
 
       setUser(data.user)
 
-      // Issue CSRF and send verification via backend
+      // Use Supabase's built-in email verification instead of backend API
+      // This is more reliable during the registration process
       try {
-        const apiBase = getApiBase()
-        const csrf = await fetch(`${apiBase}/csrf`, { method: 'GET', credentials: 'include' })
-        const csrfData = await csrf.json()
-        const token = csrfData?.token
-        if (token) {
-          const resp = await fetch(`${apiBase}/send-verification`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
-            credentials: 'include',
-            body: JSON.stringify({ email, userId: data.user.id }),
-          })
-          if (!resp.ok) {
-            const details = await resp.text()
-            console.warn('Send verification failed:', details)
-          }
+        const { error: resendError } = await supabase.auth.resend({
+          type: 'signup',
+          email: email,
+        })
+        
+        if (resendError) {
+          console.warn('Verification email dispatch error:', resendError.message)
+        } else {
+          console.log('Verification email sent successfully via Supabase')
         }
       } catch (e) {
         console.warn('Verification email dispatch error:', (e as any)?.message || e)
@@ -111,8 +100,19 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
       window.location.assign('/verify?sent=1')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'An error occurred'
-      if (msg.toLowerCase().includes('user already registered')) {
+      console.error('Registration error details:', err)
+      const lower = msg.toLowerCase()
+      if (lower.includes('user already registered')) {
         setError('This email is already registered. Please sign in instead.')
+      } else if (lower.includes('error sending confirmation email')) {
+        try {
+          const { error: resendError } = await supabase.auth.resend({ type: 'signup', email })
+          if (!resendError) {
+            window.location.assign('/verify?sent=1&provider=supabase')
+            return
+          }
+        } catch {}
+        setError('Email service is temporarily unavailable. Please try again later.')
       } else {
         setError(msg)
       }
@@ -167,8 +167,10 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Jane"
+              placeholder="John"
               required
+              disabled={loading}
+              aria-describedby={error && firstName.trim() === '' ? 'name-error' : undefined}
             />
           </div>
           <div className="space-y-2">
@@ -183,126 +185,115 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
               className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Doe"
               required
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-email">
-            Email
-          </label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              id="reg-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 pl-10 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="your@email.com"
-              required
+              disabled={loading}
+              aria-describedby={error && lastName.trim() === '' ? 'name-error' : undefined}
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-password">
-            Password
+          <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-email">
+            Email Address
           </label>
+          <input
+            id="reg-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="john@example.com"
+            required
+            disabled={loading}
+            aria-describedby={error && !emailPattern.test(email) ? 'email-error' : undefined}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-password">
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={handleGeneratePassword}
+              className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              disabled={loading}
+            >
+              Generate Strong
+            </button>
+          </div>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               id="reg-password"
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 pl-10 pr-28 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
               placeholder="••••••••"
               required
+              disabled={loading}
             />
-            <div className="absolute inset-y-0 right-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="flex items-center text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                aria-pressed={showPassword}
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
-              <button
-                type="button"
-                onClick={handleCopyPassword}
-                disabled={!password}
-                className="flex items-center text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition disabled:opacity-50"
-                aria-label="Copy password"
-              >
-                <Clipboard className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Progress value={pwdValidation.score} indicatorClassName={`${colors.bar}`} className="w-full" />
             <button
               type="button"
-              onClick={handleGeneratePassword}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              disabled={loading}
             >
-              <Wand2 className="w-4 h-4" /> Generate password
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-          <div className="text-xs mt-1 flex items-center gap-2">
-            <span className={`${colors.text}`}>Strength: {pwdValidation.strength}</span>
-            {copied && <span className="text-green-600">Copied!</span>}
-          </div>
-          {!pwdValidation.valid && password && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">Requirements: {pwdValidation.missing.join(', ')}</p>
-          )}
-          <p className="text-xs text-gray-500 dark:text-gray-400">Use at least 8 characters with letters and numbers.</p>
         </div>
 
         <div className="space-y-2">
-          <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-confirm">
+          <label className="block text-sm text-gray-700 dark:text-gray-300" htmlFor="reg-confirm-password">
             Confirm Password
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
-              id="reg-confirm"
-              type={showPassword ? 'text' : 'password'}
+              id="reg-confirm-password"
+              type={showConfirmPassword ? 'text' : 'password'}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 pl-10 pr-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
               placeholder="••••••••"
               required
+              disabled={loading}
             />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              disabled={loading}
+            >
+              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Re-enter your password to confirm.</p>
         </div>
 
         <button
           type="submit"
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={loading}
-          className="w-full py-3 rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition inline-flex items-center justify-center gap-2"
         >
-          {loading && <Loader2 className="w-4 h-4 animate-spin" />} {loading ? 'Creating Account...' : 'Create Account'}
+          {loading ? 'Creating Account...' : 'Create Account'}
         </button>
 
-        <button
-          type="button"
-          onClick={onToggle}
-          className="w-full py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition"
-        >
-          Already have an account? Sign in
-        </button>
-
-        <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          By creating an account, you agree to our Terms of Service and Privacy Policy.
-        </div>
+        {password && (
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${validatePassword(password, { requireSpecial: false, minLength: 8 }).valid ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className={validatePassword(password, { requireSpecial: false, minLength: 8 }).valid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                {validatePassword(password, { requireSpecial: false, minLength: 8 }).valid ? 'Strong password' : 'Weak password'}
+              </span>
+            </div>
+            {copied && (
+              <span className="text-green-600 dark:text-green-400 text-xs">Copied!</span>
+            )}
+          </div>
+        )}
       </form>
-
-      <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-        Password must be at least 8 characters and include a mix of letters and numbers.
-      </div>
     </div>
   )
 }

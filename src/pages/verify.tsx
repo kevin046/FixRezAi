@@ -10,12 +10,13 @@ export default function VerifyPage() {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [cooldownMs, setCooldownMs] = useState<number>(getResendCooldownRemaining())
+  const [inputEmail, setInputEmail] = useState('')
   // Get email from user object or metadata
   const getUserEmail = () => {
     return user?.email || (user?.user_metadata as any)?.email || ''
   }
   
-  const email = getUserEmail()
+  const email = getUserEmail() || inputEmail
 
   useEffect(() => {
     const id = setInterval(() => setCooldownMs(getResendCooldownRemaining()), 1000)
@@ -23,20 +24,7 @@ export default function VerifyPage() {
   }, [])
 
   useEffect(() => {
-    try {
-      // If arriving with our JWT token in query, forward to backend verifier
-      const qs = new URLSearchParams(window.location.search)
-      const token = qs.get('token')
-      if (token) {
-        const apiBase = getApiBase()
-        const verifyUrl = `${apiBase}/verify?token=${encodeURIComponent(token)}`
-        window.location.assign(verifyUrl)
-        return
-      }
-    } catch {}
-
-    // If arriving from Supabase email link, it appends a hash with type=signup and tokens
-    // Clean the hash from the URL for a nicer UX. Also, defensively hydrate session.
+    // Handle Supabase email verification links
     try {
       const hash = window.location.hash.replace('#', '')
       const hashParams = new URLSearchParams(hash)
@@ -44,19 +32,25 @@ export default function VerifyPage() {
       const access_token = hashParams.get('access_token')
       const refresh_token = hashParams.get('refresh_token')
 
-      // Fallback: if tokens are present, set the session explicitly
+      // If tokens are present from Supabase email verification
       if (access_token && refresh_token) {
         supabase.auth.setSession({ access_token, refresh_token }).then(async ({ data, error }) => {
           if (error) {
             console.warn('Supabase setSession error:', error.message)
+            setStatus({ type: 'error', message: 'Verification failed. Please try again.' })
+            return
           }
+          
           const { data: { user: fresh } } = await supabase.auth.getUser()
           if (fresh && isVerified(fresh)) {
             // Persist a metadata flag to simplify downstream checks
             await syncVerifiedMetadata()
             setStatus({ type: 'success', message: 'Email verified successfully.' })
             setTimeout(() => { window.location.replace('/verified') }, 800)
+          } else {
+            setStatus({ type: 'error', message: 'Email verification failed. Please try again.' })
           }
+          
           // Clean the hash from the URL
           const cleanUrl = window.location.pathname + window.location.search
           window.history.replaceState({}, '', cleanUrl)
@@ -72,7 +66,10 @@ export default function VerifyPage() {
             await syncVerifiedMetadata()
             setStatus({ type: 'success', message: 'Email verified successfully.' })
             setTimeout(() => { window.location.replace('/verified') }, 800)
+          } else {
+            setStatus({ type: 'error', message: 'Email verification failed. Please check your email and try again.' })
           }
+          
           // Clean the hash from the URL
           const cleanUrl = window.location.pathname + window.location.search
           window.history.replaceState({}, '', cleanUrl)
@@ -101,10 +98,9 @@ export default function VerifyPage() {
   }, [verificationStatus])
 
   const handleResend = async () => {
-    const userEmail = getUserEmail()
-    
+    const userEmail = getUserEmail() || inputEmail
     if (!userEmail) {
-      setStatus({ type: 'error', message: 'Unable to determine your email address. Please try logging in again.' })
+      setStatus({ type: 'error', message: 'Please enter your email address to resend.' })
       return
     }
     
@@ -204,6 +200,15 @@ export default function VerifyPage() {
             >
               {resendLabel}
             </button>
+            {!getUserEmail() && (
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={inputEmail}
+                onChange={(e) => setInputEmail(e.target.value)}
+                className="w-full mt-2 px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900/60 text-gray-900 dark:text-gray-100"
+              />
+            )}
             {resendDisabled && (
               <div className="text-xs text-gray-500 dark:text-gray-400">Next resend available in {cooldownSeconds}s</div>
             )}

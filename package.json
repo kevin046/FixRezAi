@@ -13,6 +13,9 @@
     "preview": "vite preview",
     "check": "tsc -b --noEmit",
     "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
     "server": "node scripts/server.js",
     "dev:full": "concurrently \"npm run dev\" \"npm run server\""
   },
@@ -67,6 +70,9 @@
     "vite": "^6.3.5",
     "vite-plugin-trae-solo-badge": "^1.0.0",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.8",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2"
   }
 }
