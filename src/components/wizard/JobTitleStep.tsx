@@ -36,7 +36,7 @@ export function JobTitleStep({ jobTitle, onJobTitleChange }: JobTitleStepProps) 
                 placeholder="e.g., Software Engineer, Marketing Manager, Data Analyst..."
                 value={jobTitle}
                 onChange={(e) => onJobTitleChange(e.target.value)}
-                className="text-lg py-3"
+                className="h-12 px-4 text-base"
                 autoFocus
               />
             </div>

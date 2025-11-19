@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
-import { supabase } from '@/lib/supabase'
-import { secureLogout } from '@/lib/auth'
  
-import { isVerified } from '@/lib/auth'
-import { Home, LayoutDashboard, Settings, Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
+ 
+import { Home, LayoutDashboard, Settings, Twitter, Instagram, Facebook, Linkedin, Menu, X, ChevronRight } from 'lucide-react'
 import LogoutButton from '@/components/LogoutButton'
 
 export default function ContactPage() {
@@ -23,16 +21,9 @@ export default function ContactPage() {
   const [challengeB, setChallengeB] = useState<number>(0)
   const [challengeAnswer, setChallengeAnswer] = useState('')
 
-  const { user, logout, hydrated } = useAuthStore()
-  const verified = user ? isVerified(user) : false
-  const handleLogout = async () => {
-    const res = await secureLogout()
-    if (res.success) {
-      window.location.replace('/?logout=1')
-    } else {
-      window.location.replace('/?logout_error=1')
-    }
-  }
+  const { user } = useAuthStore()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const displayName = ((user?.user_metadata as { first_name?: string })?.first_name) || user?.email?.split('@')[0]
 
   useEffect(() => {
     setFormStartAt(Date.now())
@@ -107,7 +98,6 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* Navigation identical to Security page */}
       <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
@@ -117,55 +107,112 @@ export default function ContactPage() {
                 <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">FixRez AI</span>
               </a>
             </div>
-            <div className="flex items-center space-x-4">
-              {user ? (
-                <>
-                  <span className="text-gray-700 dark:text-gray-300">
-                    Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
-                  </span>
-                  
-                  <a
-                    href="/"
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  >
-                    <Home className="w-4 h-4 inline mr-1" />
-                    Home
-                  </a>
-                  <a
-                    href="/dashboard"
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  >
-                    <LayoutDashboard className="w-4 h-4 inline mr-1" />
-                    Dashboard
-                  </a>
-                  <a
-                    href="/settings"
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  >
-                    <Settings className="w-4 h-4 inline mr-1" />
-                    Settings
-                  </a>
-                  <LogoutButton className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" />
-                </>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => { window.location.href = '/auth?mode=login' }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                  >
-                    Login
-                  </button>
-                  <button
-                    onClick={() => { window.location.href = '/auth?mode=register' }}
-                    className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
-                  >
-                    Register
-                  </button>
-                </div>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center space-x-4">
+                {user ? (
+                  <>
+                    <span className="text-gray-700 dark:text-gray-300">
+                      Welcome, {displayName}
+                    </span>
+                    
+                    <a
+                      href="/"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    >
+                      <Home className="w-4 h-4 inline mr-1" />
+                      Home
+                    </a>
+                    <a
+                      href="/dashboard"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    >
+                      <LayoutDashboard className="w-4 h-4 inline mr-1" />
+                      Dashboard
+                    </a>
+                    <a
+                      href="/settings"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    >
+                      <Settings className="w-4 h-4 inline mr-1" />
+                      Settings
+                    </a>
+                    <LogoutButton className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" />
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { window.location.href = '/auth?mode=login' }}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    >
+                      Login
+                    </button>
+                    <button
+                      onClick={() => { window.location.href = '/auth?mode=register' }}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                    >
+                      Register
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button
+                className="md:hidden inline-flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white/70 dark:bg-gray-800/70"
+                onClick={() => setMobileNavOpen((o) => !o)}
+                aria-label="Menu"
+                aria-expanded={mobileNavOpen}
+                aria-controls="mobile-nav-menu"
+              >
+                {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
             </div>
           </div>
         </div>
+        {mobileNavOpen && (
+          <div className="md:hidden" id="mobile-nav-menu">
+            <div className="container mx-auto px-4 pb-4">
+              <div className="rounded-lg bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg">
+                <div className="p-3">
+                  {user ? (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between px-2">
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Welcome, {displayName}</span>
+                      </div>
+                      <a href="/" className="flex items-center justify-between px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                        <span className="flex items-center gap-2"><Home className="w-4 h-4" /> Home</span>
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                      </a>
+                      <a href="/dashboard" className="flex items-center justify-between px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                        <span className="flex items-center gap-2"><LayoutDashboard className="w-4 h-4" /> Dashboard</span>
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                      </a>
+                      <a href="/settings" className="flex items-center justify-between px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                        <span className="flex items-center gap-2"><Settings className="w-4 h-4" /> Settings</span>
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                      </a>
+                      <div className="border-t border-gray-200 dark:border-gray-800" />
+                      <LogoutButton className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition text-left" />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => { window.location.href = '/auth?mode=login' }}
+                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition text-left"
+                      >
+                        Login
+                      </button>
+                      <button
+                        onClick={() => { window.location.href = '/auth?mode=register' }}
+                        className="px-3 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-md"
+                      >
+                        Register
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       <div className="max-w-2xl mx-auto px-4 py-12">

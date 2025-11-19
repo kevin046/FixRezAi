@@ -33,7 +33,7 @@ export function AIOptionsStep({ options, onOptionsChange }: AIOptionsStepProps) 
             <select
               value={options.tone}
               onChange={(e) => update('tone', e.target.value as ToneOption)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-base min-h-[48px]"
             >
               {toneOptions.map(t => (
                 <option key={t} value={t}>{t}</option>
@@ -46,7 +46,7 @@ export function AIOptionsStep({ options, onOptionsChange }: AIOptionsStepProps) 
             <select
               value={options.industry}
               onChange={(e) => update('industry', e.target.value as IndustryOption)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-base min-h-[48px]"
             >
               {industryOptions.map(i => (
                 <option key={i} value={i}>{i}</option>
@@ -59,7 +59,7 @@ export function AIOptionsStep({ options, onOptionsChange }: AIOptionsStepProps) 
             <select
               value={options.style}
               onChange={(e) => update('style', e.target.value as StyleOption)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-base min-h-[48px]"
             >
               {styleOptions.map(s => (
                 <option key={s} value={s}>{s}</option>
@@ -72,7 +72,7 @@ export function AIOptionsStep({ options, onOptionsChange }: AIOptionsStepProps) 
             <select
               value={options.atsLevel}
               onChange={(e) => update('atsLevel', e.target.value as ATSLevelOption)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-base min-h-[48px]"
             >
               {atsLevelOptions.map(a => (
                 <option key={a} value={a}>{a}</option>
@@ -89,6 +89,7 @@ export function AIOptionsStep({ options, onOptionsChange }: AIOptionsStepProps) 
           <Button
             variant="outline"
             onClick={() => onOptionsChange({ tone: 'Professional', industry: 'Tech', style: 'Achievement-focused', atsLevel: 'Advanced' })}
+            className="h-12 text-base"
           >
             Use Recommended
           </Button>

@@ -1,19 +1,19 @@
-import { useState } from 'react'
+import { useState, Suspense, lazy } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
-import { ArrowLeft, ArrowRight, Twitter, Instagram, Facebook, Linkedin } from 'lucide-react'
-import { JobTitleStep } from './wizard/JobTitleStep'
-import { JobDescriptionStep } from './wizard/JobDescriptionStep'
-import { ResumeUploadStep } from './wizard/ResumeUploadStep'
-import { ProcessingStep } from './wizard/ProcessingStep'
-import { PreviewStep } from './wizard/PreviewStep'
-import { ExportStep } from './wizard/ExportStep'
+import { ArrowLeft, ArrowRight, Home, LayoutDashboard, Settings, Menu, X, ChevronRight } from 'lucide-react'
+const JobTitleStep = lazy(() => import('./wizard/JobTitleStep').then(m => ({ default: m.JobTitleStep })))
+const JobDescriptionStep = lazy(() => import('./wizard/JobDescriptionStep').then(m => ({ default: m.JobDescriptionStep })))
+const ResumeUploadStep = lazy(() => import('./wizard/ResumeUploadStep').then(m => ({ default: m.ResumeUploadStep })))
+const ProcessingStep = lazy(() => import('./wizard/ProcessingStep').then(m => ({ default: m.ProcessingStep })))
+const PreviewStep = lazy(() => import('./wizard/PreviewStep').then(m => ({ default: m.PreviewStep })))
+const ExportStep = lazy(() => import('./wizard/ExportStep').then(m => ({ default: m.ExportStep })))
 import type { OptimizedResume } from '../types/resume'
 import { useAuthStore } from '@/stores/authStore'
 import { isVerified, resendVerification } from '@/lib/auth'
-import { supabase } from '@/lib/supabase'
-import { secureLogout } from '@/lib/auth'
+ 
+import LogoutButton from '@/components/LogoutButton'
 import { AIOptionsStep } from './wizard/AIOptionsStep'
 import type { AIOptions } from '@/types/resume'
 import { useResumeStore } from '@/stores/resumeStore'
@@ -30,10 +30,12 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
   const [resumeText, setResumeText] = useState('')
   const [optimizedResume, setOptimizedResume] = useState<OptimizedResume | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const { user, logout, hydrated } = useAuthStore()
+  const { user } = useAuthStore()
   const verified = isVerified(user)
   const [resendStatus, setResendStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [aiOptions, setAIOptions] = useState<AIOptions>({ tone: 'Professional', industry: 'Tech', style: 'Achievement-focused', atsLevel: 'Advanced' })
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const displayName = ((user?.user_metadata as { first_name?: string })?.first_name) || user?.email?.split('@')[0]
 
   const steps = [
     { id: 1, title: 'Job Title', description: 'What position are you targeting?' },
@@ -212,19 +214,11 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
     }
   }
 
-  const handleLogout = async () => {
-    const res = await secureLogout()
-    if (res.success) {
-      window.location.replace('/?logout=1')
-    } else {
-      window.location.replace('/?logout_error=1')
-    }
-  }
+  
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        {/* Navigation identical to index */}
+    <div className="min-h-[100dvh] bg-gray-50 dark:bg-gray-900 flex flex-col">
+      <div className="container mx-auto px-4 max-w-4xl flex-1 overflow-y-auto overscroll-y-contain touch-pan-y py-8 pb-44 sm:pb-24">
         <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700 mb-6">
           <div className="container mx-auto px-4 py-4">
             <div className="flex justify-between items-center">
@@ -236,54 +230,114 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
                 >
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
-                <a href="/" className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  FixRez AI
+                <a href="/" className="inline-flex items-center gap-2" aria-label="FixRez AI home">
+                  <img src="/fixrez-favicon-black.svg" alt="FixRez AI" className="h-12 w-20" loading="eager" decoding="async" />
+                  <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">FixRez AI</span>
                 </a>
               </div>
-              <div className="flex items-center space-x-4">
-                {user ? (
-                  <>
-                    <span className="text-gray-700 dark:text-gray-300">
-                      Welcome, {(user.user_metadata as any)?.first_name ?? user.email?.split('@')[0]}
-                    </span>
-                    <a
-                      href="/dashboard"
-                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                    >
-                      Dashboard
-                    </a>
-                    <a
-                      href="/settings"
-                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                    >
-                      Settings
-                    </a>
-                    <button
-                      onClick={handleLogout}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                    >
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => { window.location.href = '/auth?mode=login' }}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                    >
-                      Login
-                    </button>
-                    <button
-                      onClick={() => { window.location.href = '/auth?mode=register' }}
-                      className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
-                    >
-                      Register
-                    </button>
-                  </div>
-                )}
+              <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center space-x-4">
+                  {user ? (
+                    <>
+                      <span className="text-gray-700 dark:text-gray-300">Welcome, {displayName}</span>
+                      <a
+                        href="/"
+                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      >
+                        <Home className="w-4 h-4 inline mr-1" />
+                        Home
+                      </a>
+                      <a
+                        href="/dashboard"
+                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      >
+                        <LayoutDashboard className="w-4 h-4 inline mr-1" />
+                        Dashboard
+                      </a>
+                      <a
+                        href="/settings"
+                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      >
+                        <Settings className="w-4 h-4 inline mr-1" />
+                        Settings
+                      </a>
+                      <LogoutButton className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white" />
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { window.location.href = '/auth?mode=login' }}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                      >
+                        Login
+                      </button>
+                      <button
+                        onClick={() => { window.location.href = '/auth?mode=register' }}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-full hover:from-blue-700 hover:to-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                      >
+                        Register
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  className="md:hidden inline-flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white/70 dark:bg-gray-800/70"
+                  onClick={() => setMobileNavOpen((o) => !o)}
+                  aria-label="Menu"
+                  aria-expanded={mobileNavOpen}
+                  aria-controls="mobile-nav-menu"
+                >
+                  {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
               </div>
             </div>
           </div>
+          {mobileNavOpen && (
+            <div className="md:hidden" id="mobile-nav-menu">
+              <div className="container mx-auto px-4 pb-4">
+                <div className="rounded-lg bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 shadow-lg">
+                  <div className="p-3">
+                    {user ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between px-2">
+                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Welcome, {displayName}</span>
+                        </div>
+                        <a href="/" className="flex items-center justify-between px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                          <span className="flex items-center gap-2"><Home className="w-4 h-4" /> Home</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </a>
+                        <a href="/dashboard" className="flex items-center justify-between px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                          <span className="flex items-center gap-2"><LayoutDashboard className="w-4 h-4" /> Dashboard</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </a>
+                        <a href="/settings" className="flex items-center justify-between px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                          <span className="flex items-center gap-2"><Settings className="w-4 h-4" /> Settings</span>
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </a>
+                        <div className="border-t border-gray-200 dark:border-gray-800" />
+                        <LogoutButton className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition text-left" />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={() => { window.location.href = '/auth?mode=login' }}
+                          className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition text-left"
+                        >
+                          Login
+                        </button>
+                        <button
+                          onClick={() => { window.location.href = '/auth?mode=register' }}
+                          className="px-3 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-md"
+                        >
+                          Register
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </nav>
 
         {/* Header */}
@@ -307,7 +361,7 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
               <Progress value={(currentStep / steps.length) * 100} className="mb-4" />
             </div>
             
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
               {steps.map((step) => (
                 <div
                   key={step.id}
@@ -320,7 +374,7 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
                   }`}
                 >
                   <div className="font-medium text-sm">{step.title}</div>
-                  <div className="text-xs mt-1">{step.description}</div>
+                  <div className="hidden md:block text-xs mt-1">{step.description}</div>
                 </div>
               ))}
             </div>
@@ -359,17 +413,19 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {renderStep()}
+            <Suspense fallback={<div className="py-10 text-center text-gray-500 dark:text-gray-400">Loading…</div>}>
+              {renderStep()}
+            </Suspense>
           </CardContent>
         </Card>
 
         {/* Navigation */}
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 justify-between">
+        <div className="hidden sm:flex justify-between">
           <Button
             variant="outline"
             onClick={handlePrevious}
             disabled={currentStep === 1}
-            className="w-full sm:w-auto"
+            className="sm:w-auto h-11"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Previous
@@ -379,15 +435,39 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
             <Button
               onClick={handleNext}
               disabled={!canProceed() || isProcessing || (!verified && currentStep === 4)}
-              className="w-full sm:w-auto"
+              className="sm:w-auto h-11"
             >
               Next
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           )}
         </div>
+        <div className="fixed bottom-0 left-0 right-0 z-[100] sm:hidden bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 p-4 shadow-lg" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="container mx-auto px-4 max-w-4xl">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentStep === 1}
+                className="w-full h-12 active:scale-95"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Previous
+              </Button>
+              {currentStep < steps.length && currentStep !== 5 && (
+                <Button
+                  onClick={handleNext}
+                  disabled={!canProceed() || isProcessing || (!verified && currentStep === 4)}
+                  className="w-full h-12 active:scale-95"
+                >
+                  Next
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
 
-        
       </div>
     </div>
   )

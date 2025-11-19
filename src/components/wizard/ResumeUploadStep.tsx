@@ -138,32 +138,30 @@ export function ResumeUploadStep({
       </div>
 
       {/* Upload Method Toggle */}
-      <div className="flex justify-center">
+          <div className="flex justify-center">
         <div className="bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
           <Button
             variant={uploadMethod === 'file' ? 'default' : 'ghost'}
-            size="sm"
             onClick={() => setUploadMethod('file')}
-            className="mr-1"
+            className="h-12 text-base mr-1"
           >
-            <File className="w-4 h-4 mr-2" />
+            <File className="w-5 h-5 mr-2" />
             Upload File
           </Button>
           <Button
             variant={uploadMethod === 'text' ? 'default' : 'ghost'}
-            size="sm"
             onClick={() => setUploadMethod('text')}
-            className="mr-1"
+            className="h-12 text-base mr-1"
           >
-            <FileText className="w-4 h-4 mr-2" />
+            <FileText className="w-5 h-5 mr-2" />
             Paste Text
           </Button>
           <Button
             variant={uploadMethod === 'scratch' ? 'default' : 'ghost'}
-            size="sm"
+            className="h-12 text-base"
             onClick={() => setUploadMethod('scratch')}
           >
-            <User className="w-4 h-4 mr-2" />
+            <User className="w-5 h-5 mr-2" />
             Create from Scratch
           </Button>
         </div>
@@ -198,6 +196,7 @@ export function ResumeUploadStep({
                 <Button
                   variant="outline"
                   onClick={() => onResumeFileChange(null)}
+                  className="h-12 text-base"
                 >
                   Remove File
                 </Button>
@@ -218,6 +217,7 @@ export function ResumeUploadStep({
                 <Button
                   variant="outline"
                   onClick={() => fileInputRef.current?.click()}
+                  className="h-12 text-base"
                 >
                   Choose File
                 </Button>
@@ -300,6 +300,7 @@ Bachelor of Science in Computer Science | University Name | 2018
                   placeholder="John Doe"
                   value={personalInfo.fullName}
                   onChange={(e) => handlePersonalInfoChange('fullName', e.target.value)}
+                  className="h-12 px-4 text-base"
                 />
               </div>
               
@@ -313,6 +314,7 @@ Bachelor of Science in Computer Science | University Name | 2018
                   placeholder="john.doe@email.com"
                   value={personalInfo.email}
                   onChange={(e) => handlePersonalInfoChange('email', e.target.value)}
+                  className="h-12 px-4 text-base"
                 />
               </div>
               
@@ -325,6 +327,9 @@ Bachelor of Science in Computer Science | University Name | 2018
                   placeholder="(555) 123-4567"
                   value={personalInfo.phone}
                   onChange={(e) => handlePersonalInfoChange('phone', e.target.value)}
+                  type="tel"
+                  inputMode="tel"
+                  className="h-12 px-4 text-base"
                 />
               </div>
               
@@ -337,6 +342,7 @@ Bachelor of Science in Computer Science | University Name | 2018
                   placeholder="City, State"
                   value={personalInfo.location}
                   onChange={(e) => handlePersonalInfoChange('location', e.target.value)}
+                  className="h-12 px-4 text-base"
                 />
               </div>
             </div>

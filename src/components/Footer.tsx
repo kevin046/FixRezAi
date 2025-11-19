@@ -8,21 +8,21 @@ const XIcon = ({ className }: { className?: string }) => (
 
 export default function Footer() {
   return (
-    <footer className="py-10 border-t border-gray-200 dark:border-gray-700">
+    <footer className="w-full py-10 border-t border-gray-200 dark:border-gray-700">
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-gray-500 dark:text-gray-400">© 2025 Summit Pixels Inc.</p>
-          <div className="flex items-center gap-6 text-sm">
+          <p className="text-center md:text-left text-xs sm:text-sm text-gray-500 dark:text-gray-400 w-full md:w-auto">© 2025 Summit Pixels Inc.</p>
+          <div className="w-full md:w-auto flex flex-wrap items-center justify-center md:justify-end gap-2 sm:gap-4 text-xs sm:text-sm">
             <a href="/terms" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Terms</a>
             <a href="/privacy" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Privacy</a>
             <a href="/contact" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Contact</a>
             <a href="/accessibility" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Accessibility</a>
             <a href="/settings#security" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Security</a>
             <a href="/sitemap" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Sitemap</a>
-            <span className="text-gray-400">•</span>
+            <span className="hidden sm:inline text-gray-400">•</span>
             <span className="text-gray-600 dark:text-gray-300">Powered by Summit Pixels Inc.</span>
-            <span className="text-gray-400">•</span>
-            <div className="flex items-center gap-4">
+            <span className="hidden sm:inline text-gray-400">•</span>
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
               <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                 <XIcon className="w-5 h-5" />
               </a>
