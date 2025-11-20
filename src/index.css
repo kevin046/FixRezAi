@@ -71,10 +71,15 @@
     @apply border-border;
   }
   html, body {
-    @apply overflow-x-hidden;
+    @apply min-h-[100dvh] overflow-x-hidden overflow-y-auto overscroll-y-contain;
+    -webkit-overflow-scrolling: touch;
   }
   body {
     @apply bg-background text-foreground;
+  }
+  #root {
+    @apply min-h-[100dvh] flex flex-col;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 

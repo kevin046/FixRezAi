@@ -184,7 +184,7 @@ export class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         this.props.fallback || (
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="min-h-[100dvh] bg-gray-50 flex items-center justify-center p-4">
             <div className="max-w-md w-full">
               <ErrorMessage
                 type="server"

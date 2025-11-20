@@ -5,7 +5,7 @@ import { ArrowLeft, Medal } from 'lucide-react';
 export default function ATSRatingPage() {
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-blue-900">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-blue-900">
       {/* Header */}
       <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4">

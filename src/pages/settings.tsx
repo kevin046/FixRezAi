@@ -366,7 +366,7 @@ const SettingsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div className="min-h-[100dvh] bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       {/* Enhanced Navigation */}
       <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4">

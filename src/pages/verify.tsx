@@ -147,7 +147,7 @@ export default function VerifyPage() {
   
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
+    <div className="min-h-[100dvh] bg-white dark:bg-gray-900">
       {/* Top nav bar */}
       <nav className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center justify-between gap-2">

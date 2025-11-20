@@ -218,7 +218,10 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
 
   return (
     <div className="min-h-[100dvh] bg-gray-50 dark:bg-gray-900 flex flex-col">
-      <div className="container mx-auto px-4 max-w-4xl flex-1 overflow-y-auto overscroll-y-contain touch-pan-y py-8 pb-44 sm:pb-24">
+      <div
+        className="container mx-auto px-4 max-w-4xl flex-1 overscroll-y-contain touch-pan-y py-8"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 160px)' }}
+      >
         <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700 mb-6">
           <div className="container mx-auto px-4 py-4">
             <div className="flex justify-between items-center">
@@ -442,6 +445,7 @@ export function OptimizationWizard({ onBack }: OptimizationWizardProps) {
             </Button>
           )}
         </div>
+        <div aria-hidden className="h-36 sm:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} />
         <div className="fixed bottom-0 left-0 right-0 z-[100] sm:hidden bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-800 p-4 shadow-lg" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <div className="container mx-auto px-4 max-w-4xl">
             <div className="flex gap-2">

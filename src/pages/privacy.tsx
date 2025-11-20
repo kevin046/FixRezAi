@@ -11,7 +11,7 @@ const PrivacyPolicy: React.FC = () => {
   const displayName = ((user?.user_metadata as { first_name?: string })?.first_name) || user?.email?.split('@')[0]
 
   return (
-    <div className="bg-gray-100 min-h-screen">
+    <div className="bg-gray-100 min-h-[100dvh]">
       <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">

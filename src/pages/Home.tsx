@@ -20,7 +20,7 @@ export default function Home() {
   }, [])
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-[100dvh]">
       {/* SEO-Optimized Content Section */}
       <section className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900 py-16">
         <div className="container mx-auto px-4 max-w-6xl">

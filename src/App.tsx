@@ -271,7 +271,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 flex flex-col">
+    <div className="min-h-[100dvh] bg-white dark:bg-gray-900 flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Global Unverified User Notification */}
       {user && !isVerified(user) && currentView !== 'verify' && <UnverifiedUserNotification />}
       
