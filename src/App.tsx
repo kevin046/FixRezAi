@@ -21,6 +21,7 @@ import SitemapPage from './pages/sitemap'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import { Toaster } from 'sonner'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import Footer from '@/components/Footer'
 import { testApiConnectivity } from '@/lib/apiTest'
 import UnverifiedUserNotification from '@/components/UnverifiedUserNotification'
@@ -280,6 +281,7 @@ function App() {
       </div>
       <Footer />
       <Toaster position="top-right" />
+      <SpeedInsights />
     </div>
   )
 }

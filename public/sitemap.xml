@@ -1,85 +1,85 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://fixrez.ai/</loc>
+    <loc>https://www.fixrez.com/</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/optimize</loc>
+    <loc>https://www.fixrez.com/optimize</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/dashboard</loc>
+    <loc>https://www.fixrez.com/dashboard</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/settings</loc>
+    <loc>https://www.fixrez.com/settings</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/verify</loc>
+    <loc>https://www.fixrez.com/verify</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/contact</loc>
+    <loc>https://www.fixrez.com/contact</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/terms</loc>
+    <loc>https://www.fixrez.com/terms</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/privacy</loc>
+    <loc>https://www.fixrez.com/privacy</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/accessibility</loc>
+    <loc>https://www.fixrez.com/accessibility</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/security</loc>
+    <loc>https://www.fixrez.com/security</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/ats-rating</loc>
+    <loc>https://www.fixrez.com/ats-rating</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/sitemap</loc>
+    <loc>https://www.fixrez.com/sitemap</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/forgot-password</loc>
+    <loc>https://www.fixrez.com/forgot-password</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.2</priority>
   </url>
   <url>
-    <loc>https://fixrez.ai/reset-password</loc>
+    <loc>https://www.fixrez.com/reset-password</loc>
     <lastmod>2025-11-19</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.2</priority>
