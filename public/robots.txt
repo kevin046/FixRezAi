@@ -11,5 +11,4 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
-# Sitemaps
-Sitemap: https://www.fixrez.com/sitemap.xml
+Sitemap: https://fixrez.ai/sitemap.xml
