@@ -71,8 +71,11 @@
     @apply border-border;
   }
   html, body {
-    @apply min-h-[100dvh] overflow-x-hidden overflow-y-auto overscroll-y-contain;
+    @apply min-h-[100dvh] overflow-x-hidden overflow-y-auto;
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
     -webkit-overflow-scrolling: touch;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-background text-foreground;
