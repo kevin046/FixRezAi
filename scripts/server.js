@@ -42,7 +42,7 @@ console.log('🔑 OPENROUTER_API_KEY present:', Boolean(process.env.OPENROUTER_A
 console.log('🧪 DEV_AI_MOCK:', String(process.env.DEV_AI_MOCK || '').toLowerCase() === 'true' ? 'enabled' : 'disabled')
 
 const corsOptions = {
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow same-origin or server-to-server
     if (!origin) return callback(null, true)
     // Allow any localhost/127.0.0.1 port for dev
@@ -67,7 +67,7 @@ const verificationService = new VerificationService();
 const verificationServiceEnhanced = new VerificationServiceEnhanced();
 
 // Simple health check
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });
 });
 
@@ -90,15 +90,15 @@ app.get('/api/status', (req, res) => {
 function wrap(handler) {
   return async (req, res) => {
     try {
-    console.log('🔍 Verification Status Debug:', {
-      hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-      devAuthBypass: DEV_AUTH_BYPASS,
-      userId: req.user.id,
-      userEmail: req.user.email,
-      emailConfirmedAt: req.user.email_confirmed_at,
-      nodeEnv: process.env.NODE_ENV,
-      vercelEnv: process.env.VERCEL_ENV
-    });
+      console.log('🔍 Verification Status Debug:', {
+        hasServiceKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+        devAuthBypass: DEV_AUTH_BYPASS,
+        userId: req.user.id,
+        userEmail: req.user.email,
+        emailConfirmedAt: req.user.email_confirmed_at,
+        nodeEnv: process.env.NODE_ENV,
+        vercelEnv: process.env.VERCEL_ENV
+      });
       await handler(req, res);
     } catch (err) {
       console.error('API route error:', err?.message || err);
@@ -111,7 +111,7 @@ function wrap(handler) {
 const LOG_DIR = path.resolve(process.cwd(), 'logs')
 const VERIFY_LOG = path.join(LOG_DIR, 'verify.log')
 function ensureLogDir() {
-  try { fs.mkdirSync(LOG_DIR, { recursive: true }) } catch {}
+  try { fs.mkdirSync(LOG_DIR, { recursive: true }) } catch { }
 }
 function auditLog(entry) {
   try {
@@ -240,10 +240,10 @@ async function requireAuth(req, res, next) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey)
-  
+
   try {
     const { data, error } = await admin.auth.getUser(token)
-    
+
     if (error || !data?.user) {
       const msg = (error?.message || '').toLowerCase()
       const reason = msg.includes('expired') ? 'token_expired' : 'invalid_token'
@@ -252,7 +252,7 @@ async function requireAuth(req, res, next) {
       auditLog(entry)
       return res.status(401).json({ success: false, error: reason === 'token_expired' ? 'Token expired' : 'Invalid token' })
     }
-    
+
     req.user = data.user
     next()
   } catch (e) {
@@ -292,10 +292,10 @@ async function requireVerified(req, res, next) {
   }
 
   const admin = createClient(supabaseUrl, serviceKey)
-  
+
   try {
     const { data, error } = await admin.auth.getUser(token)
-    
+
     if (error || !data?.user) {
       const msg = (error?.message || '').toLowerCase()
       const reason = msg.includes('expired') ? 'token_expired' : 'invalid_token'
@@ -304,44 +304,44 @@ async function requireVerified(req, res, next) {
       auditLog(entry)
       return res.status(401).json({ success: false, error: reason === 'token_expired' ? 'Token expired' : 'Invalid token' })
     }
-    
+
     const user = data.user
-    
+
     // Use the enhanced verification service to get accurate verification status
     const verificationResult = await verificationService.getUserVerificationStatus(user.id)
-    
+
     if (!verificationResult.success) {
       const entry = { type: 'verify', result: 'verification_check_failed', path: req.path, ip: req.ip, ts: new Date().toISOString(), error: verificationResult.error }
       console.error('AUDIT verify:', entry)
       auditLog(entry)
       return res.status(500).json({ success: false, error: 'Verification check failed' })
     }
-    
+
     const isVerified = verificationResult.status.is_verified
-    
-    const entry = { 
-      type: 'verify', 
-      result: isVerified ? 'verified' : 'unverified', 
-      path: req.path, 
-      ip: req.ip, 
-      ts: new Date().toISOString(), 
-      userId: user.id, 
-      email: user.email, 
-      verificationStatus: verificationResult.status 
+
+    const entry = {
+      type: 'verify',
+      result: isVerified ? 'verified' : 'unverified',
+      path: req.path,
+      ip: req.ip,
+      ts: new Date().toISOString(),
+      userId: user.id,
+      email: user.email,
+      verificationStatus: verificationResult.status
     }
     console.log('AUDIT verify:', entry)
     auditLog(entry)
-    
+
     if (!isVerified) {
-      return res.status(403).json({ 
-        success: false, 
+      return res.status(403).json({
+        success: false,
         error: 'Email verification required',
         verification_required: true,
         has_valid_token: verificationResult.status.has_valid_token,
         token_expires_at: verificationResult.status.token_expires_at
       })
     }
-    
+
     // Attach user to request for downstream handlers if needed
     req.user = user
     next()
@@ -356,13 +356,13 @@ async function requireVerified(req, res, next) {
 // Enhanced endpoint to get current user with verification status
 app.get('/api/me', ipAllowlist, rateLimiter, requireVerified, async (req, res) => {
   const u = req.user || null
-  
+
   if (u) {
     // Get enhanced verification status
     const verificationResult = await verificationService.getUserVerificationStatus(u.id)
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       user: {
         id: u.id,
         email: u.email,
@@ -409,14 +409,14 @@ app.post('/api/send-verification', ipAllowlist, rateLimiter, requireAuth, verifi
       email,
       options: { emailRedirectTo: `${WEBSITE_URL}/verify` }
     })
-    
+
     if (resendErr) {
       const details = resendErr.message || 'Unknown Supabase error'
       console.error('❌ Supabase resend error:', details)
       auditLog({ type: 'send_verification_fail_supabase', email, userId: user.id, ts: new Date().toISOString(), details })
       return res.status(502).json({ success: false, error: `Supabase email error: ${details}` })
     }
-    
+
     console.log('✅ Supabase resend completed (but may not have sent if email already confirmed)')
     console.log('📬 Supabase response:', resendData)
     auditLog({ type: 'send_verification_supabase', email, userId: user.id, ts: new Date().toISOString() })
@@ -444,7 +444,7 @@ app.post('/api/send-verification-public', ipAllowlist, rateLimiter, verification
     console.log('📧 Attempting unauthenticated verification resend for:', email)
     console.log('🔍 Environment check - RESEND_API_KEY:', process.env.RESEND_API_KEY ? 'Present' : 'Missing')
     console.log('🔍 Environment check - SUPABASE_SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Present' : 'Missing')
-    
+
     // Create Supabase client for this endpoint
     const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -452,9 +452,9 @@ app.post('/api/send-verification-public', ipAllowlist, rateLimiter, verification
       console.error('❌ Supabase service role key not configured')
       return res.status(500).json({ success: false, error: 'Server not configured - missing Supabase service role key' })
     }
-    
+
     const admin = createClient(supabaseUrl, serviceKey)
-    
+
     // First, find the user by email to get their user ID
     const { data: users, error: listError } = await admin.auth.admin.listUsers({
       page: 1,
@@ -468,7 +468,7 @@ app.post('/api/send-verification-public', ipAllowlist, rateLimiter, verification
 
     // Find the specific user by email
     const user = users.users.find(u => u.email === email)
-    
+
     if (!user) {
       console.error('❌ User not found for email:', email)
       return res.status(404).json({ success: false, error: 'No account found with this email address' })
@@ -503,13 +503,13 @@ app.post('/api/send-verification-public', ipAllowlist, rateLimiter, verification
 
     // Check if Resend API key is available
     const hasResendKey = Boolean(process.env.RESEND_API_KEY)
-    
+
     try {
       const { error } = await admin.auth.resend({
         type: 'signup',
         email: email,
-        options: { 
-          emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/verify` 
+        options: {
+          emailRedirectTo: `${process.env.FRONTEND_URL || 'http://localhost:5174'}/verify`
         }
       })
       if (error) {
@@ -532,10 +532,10 @@ app.post('/api/send-verification-public', ipAllowlist, rateLimiter, verification
 
     console.log('✅ Verification email sent successfully to:', email)
     auditLog({ type: 'send_verification_public', email, ip: req.ip, ts: new Date().toISOString() })
-    
-    return res.json({ 
-      success: true, 
-      message: 'Verification email sent! Please check your inbox (and spam folder) for the verification link. Click the link to verify your email address.' 
+
+    return res.json({
+      success: true,
+      message: 'Verification email sent! Please check your inbox (and spam folder) for the verification link. Click the link to verify your email address.'
     })
 
   } catch (error) {
@@ -596,7 +596,7 @@ app.get('/api/verify', ipAllowlist, rateLimiter, verificationMiddleware.logVerif
       const supabaseUrl = process.env.SUPABASE_URL || 'https://oailemrpflfahdhoxbbx.supabase.co'
       const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
       if (serviceKey) {
-        const decoded = (() => { try { return JSON.parse(Buffer.from(String(token).split('.')[1].replace(/-/g,'+').replace(/_/g,'/'),'base64').toString('utf8')) } catch { return null } })()
+        const decoded = (() => { try { return JSON.parse(Buffer.from(String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')) } catch { return null } })()
         if (decoded && decoded.email) {
           const admin = createClient(supabaseUrl, serviceKey)
           await admin.auth.resend({ type: 'signup', email: decoded.email, options: { emailRedirectTo: `${WEBSITE_URL}/verify` } })
@@ -634,17 +634,17 @@ app.get('/api/verification/status', ipAllowlist, rateLimiter, requireAuth, verif
     if (!hasKey || DEV_AUTH_BYPASS) {
       // In dev mode or when service key is missing, use basic Supabase verification
       const isVerified = Boolean(user.email_confirmed_at);
-    console.log('📋 Using basic Supabase verification:', { isVerified, emailConfirmedAt: user.email_confirmed_at });
-      return res.json({ 
-        success: true, 
-        status: { 
-          is_verified: isVerified, 
-          verification_timestamp: user.email_confirmed_at || null, 
-          verification_method: isVerified ? 'supabase_email' : null, 
-          verification_token_id: null, 
-          has_valid_token: isVerified, 
-          token_expires_at: null 
-        } 
+      console.log('📋 Using basic Supabase verification:', { isVerified, emailConfirmedAt: user.email_confirmed_at });
+      return res.json({
+        success: true,
+        status: {
+          is_verified: isVerified,
+          verification_timestamp: user.email_confirmed_at || null,
+          verification_method: isVerified ? 'supabase_email' : null,
+          verification_token_id: null,
+          has_valid_token: isVerified,
+          token_expires_at: null
+        }
       })
     }
     const statusResult = await verificationServiceEnhanced.getUserVerificationStatus(user.id)
@@ -673,16 +673,16 @@ app.get('/api/verification/status/:userId', ipAllowlist, rateLimiter, requireAut
     if (!hasKey || DEV_AUTH_BYPASS) {
       // In dev mode or when service key is missing, use basic Supabase verification
       const isVerified = Boolean(user.email_confirmed_at);
-      return res.json({ 
-        success: true, 
-        status: { 
-          is_verified: isVerified, 
-          verification_timestamp: user.email_confirmed_at || null, 
-          verification_method: isVerified ? 'supabase_email' : null, 
-          verification_token_id: null, 
-          has_valid_token: isVerified, 
-          token_expires_at: null 
-        } 
+      return res.json({
+        success: true,
+        status: {
+          is_verified: isVerified,
+          verification_timestamp: user.email_confirmed_at || null,
+          verification_method: isVerified ? 'supabase_email' : null,
+          verification_token_id: null,
+          has_valid_token: isVerified,
+          token_expires_at: null
+        }
       })
     }
     const statusResult = await verificationServiceEnhanced.getUserVerificationStatus(targetUserId)
@@ -701,7 +701,7 @@ app.get('/api/verification-stats', ipAllowlist, rateLimiter, requireAuth, async 
   try {
     // Check if user is admin (you may want to add proper admin role checking)
     const stats = await verificationService.getVerificationStats()
-    
+
     res.json({
       success: true,
       stats
@@ -964,7 +964,7 @@ app.get('/api/ats/progress/:sessionId', ...ATS_MW, getAnalysisProgress);
 app.get('/api/ats/results/:sessionId', ...ATS_MW, getAnalysisResults);
 app.delete('/api/ats/session/:sessionId', ...ATS_MW, cleanupSession);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
   console.log(`🔌 Dev API server running at http://localhost:${PORT}`);
   console.log('➡ Routes:');
@@ -996,8 +996,8 @@ app.get('/api/verification-metrics', ipAllowlist, rateLimiter, requireAuth, asyn
     const useResend = providerPref === 'resend';
     const emailConfigured = useResend ? Boolean(process.env.RESEND_API_KEY) : Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
     const provider = useResend ? 'resend' : 'supabase';
-    const fromEmail = useResend 
-      ? (process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>') 
+    const fromEmail = useResend
+      ? (process.env.RESEND_FROM_EMAIL || 'FixRez <onboarding@resend.dev>')
       : (process.env.SUPABASE_SMTP_FROM || 'hello@summitpixels.com');
     const rateInfo = { window_ms: RATE_WINDOW_MS, max: RATE_MAX, active_buckets: RATE_BUCKET.size };
     const health = {
@@ -1020,7 +1020,7 @@ app.get('/api/verification-metrics', ipAllowlist, rateLimiter, requireAuth, asyn
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
- 
+
 app.get('/api/verification-quota', ipAllowlist, rateLimiter, requireAuth, async (req, res) => {
   try {
     console.log('🔍 Verification Status Debug:', {

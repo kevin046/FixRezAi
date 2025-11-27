@@ -23,12 +23,13 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import { Toaster } from 'sonner'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import Footer from '@/components/Footer'
-import { testApiConnectivity } from '@/lib/apiTest'
 import UnverifiedUserNotification from '@/components/UnverifiedUserNotification'
+import { HelmetProvider } from 'react-helmet-async'
+import { SEO } from './components/SEO'
 
 function App() {
   const { user, setUser, setVerificationStatus, logout, verificationStatus, verificationLoaded, fetchVerificationStatus } = useAuthStore()
-  
+
   // Check URL path to determine initial view
   const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword' => {
     const path = window.location.pathname
@@ -85,7 +86,7 @@ function App() {
   const handleGetStarted = () => {
     if (user) {
       if (!isVerified(user)) {
-          handleNavigation('verify')
+        handleNavigation('verify')
       } else {
         handleNavigation('wizard')
       }
@@ -134,18 +135,8 @@ function App() {
   }, [user])
 
   const prevUserIdRef = { current: null as string | null }
-  
-  // Run API connectivity test on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      testApiConnectivity().then(results => {
-        console.log('🔍 API Connectivity Test Results:', results);
-      }).catch(error => {
-        console.error('❌ API test failed:', error);
-      });
-    }
-  }, []);
-  
+
+
   // Check for existing session on mount
   useEffect(() => {
     const checkSession = async () => {
@@ -155,12 +146,12 @@ function App() {
         prevUserIdRef.current = session.user.id
         await fetchVerificationStatus(session.user.id)
         // Only sync once if email_confirmed_at present and metadata not yet verified
-        try { if (session.user.email_confirmed_at && session.user.user_metadata?.verified !== true) { await syncVerifiedMetadata() } } catch {}
+        try { if (session.user.email_confirmed_at && session.user.user_metadata?.verified !== true) { await syncVerifiedMetadata() } } catch { }
       }
     }
-  
+
     checkSession()
-  
+
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
@@ -175,9 +166,9 @@ function App() {
         setVerificationStatus(null)
       }
       // Best-effort metadata sync when email becomes confirmed and not already set
-      try { if (session?.user?.email_confirmed_at && session.user.user_metadata?.verified !== true) { syncVerifiedMetadata() } } catch {}
+      try { if (session?.user?.email_confirmed_at && session.user.user_metadata?.verified !== true) { syncVerifiedMetadata() } } catch { }
     })
-  
+
     return () => subscription.unsubscribe()
   }, [setUser, setVerificationStatus])
 
@@ -225,7 +216,7 @@ function App() {
               if (fresh?.email_confirmed_at && fresh.user_metadata?.verified !== true) {
                 await syncVerifiedMetadata()
               }
-            } catch {}
+            } catch { }
           })
           .catch((e) => console.warn('Supabase setSession error:', e))
       }
@@ -272,20 +263,24 @@ function App() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-white dark:bg-gray-900 flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      {/* Global Unverified User Notification */}
-      {user && !isVerified(user) && currentView !== 'verify' && <UnverifiedUserNotification />}
-      
-      <div className="flex-1">
-        {renderView()}
+    <HelmetProvider>
+      <SEO />
+      <div className="min-h-[100dvh] bg-white dark:bg-gray-900 flex flex-col" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {/* Global Unverified User Notification */}
+        {user && !isVerified(user) && currentView !== 'verify' && <UnverifiedUserNotification />}
+
+        <div className="flex-1">
+          {renderView()}
+        </div>
+        <Footer />
+        <Toaster position="top-right" />
+        <SpeedInsights />
       </div>
-      <Footer />
-      <Toaster position="top-right" />
-      <SpeedInsights />
-    </div>
+    </HelmetProvider>
   )
 }
 
 export default App
 
-
+
+

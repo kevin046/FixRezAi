@@ -84,13 +84,30 @@ export default function AuthPage() {
                 <p className="text-xs text-slate-500 dark:text-gray-400 text-center">
                   Email verification is required to access your dashboard.
                 </p>
+
+                {/* Social Proof */}
+                <div className="pt-4 border-t border-slate-200 dark:border-gray-800">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <div className="flex -space-x-2">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="w-6 h-6 rounded-full bg-slate-200 dark:bg-gray-700 border-2 border-white dark:border-gray-900 flex items-center justify-center overflow-hidden">
+                          <span className="text-[8px] font-bold text-slate-500">U{i}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <span className="text-xs font-medium text-slate-600 dark:text-gray-300">
+                      Trusted by 10,000+ job seekers
+                    </span>
+                  </div>
+                  <p className="text-xs text-center text-slate-500 dark:text-gray-400 italic">
+                    "Helped me land my dream job in 2 weeks!"
+                  </p>
+                </div>
               </div>
             </section>
           </div>
         </div>
       </main>
-
-      
     </div>
   )
 }
