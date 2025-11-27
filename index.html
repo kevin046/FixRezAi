@@ -6,51 +6,43 @@
   <link rel="icon" type="image/svg+xml" href="/fixrez-favicon-black.svg?v=1" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <!doctype html>
-  <html lang="en">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="FixRez AI" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.svg" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>FixRez AI - Professional Resume Optimization Tool | ATS Resume Scanner</title>
+  <meta name="description"
+    content="FixRez AI: Free AI resume optimizer. Beat ATS systems and land more interviews with our professional tool." />
+  <meta name="robots" content="index, follow" />
+  <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE_HERE" />
+  <!-- Canonical URL - Primary Domain Strategy -->
+  <link rel="canonical" href="https://www.fixrez.com/" />
 
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/fixrez-favicon-black.svg?v=1" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="FixRez AI" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.svg" />
-    <link rel="manifest" href="/manifest.json" />
-    <title>FixRez AI - Professional Resume Optimization Tool | ATS Resume Scanner</title>
-    <meta name="description"
-      content="FixRez AI: Free AI resume optimizer. Beat ATS systems and land more interviews with our professional tool." />
-    <meta name="robots" content="index, follow" />
-    <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE_HERE" />
-    <!-- Canonical URL - Primary Domain Strategy -->
-    <link rel="canonical" href="https://www.fixrez.com/" />
+  <!-- Alternative Domain Canonicals (if needed) -->
+  <!-- <link rel="canonical" href="https://www.fixrez.ai/" /> -->
+  <!-- <link rel="canonical" href="https://fixrez-han4cbj05-kevin046s-projects.vercel.app/" /> -->
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
 
-    <!-- Alternative Domain Canonicals (if needed) -->
-    <!-- <link rel="canonical" href="https://www.fixrez.ai/" /> -->
-    <!-- <link rel="canonical" href="https://fixrez-han4cbj05-kevin046s-projects.vercel.app/" /> -->
-    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+  <!-- Open Graph -->
+  <meta property="og:title" content="FixRez AI - Professional Resume Optimization Tool" />
+  <meta property="og:description"
+    content="FixRez AI helps job seekers optimize resumes with advanced AI technology. Get past ATS systems and land more interviews with our professional resume optimization tool." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.fixrez.com/" />
+  <meta property="og:image" content="https://www.fixrez.com/fixrez-icon.svg" />
 
-    <!-- Open Graph -->
-    <meta property="og:title" content="FixRez AI - Professional Resume Optimization Tool" />
-    <meta property="og:description"
-      content="FixRez AI helps job seekers optimize resumes with advanced AI technology. Get past ATS systems and land more interviews with our professional resume optimization tool." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.fixrez.com/" />
-    <meta property="og:image" content="https://www.fixrez.com/fixrez-icon.svg" />
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="FixRez AI - Professional Resume Optimization Tool" />
+  <meta name="twitter:description"
+    content="FixRez AI helps job seekers optimize resumes with advanced AI technology. Get past ATS systems and land more interviews with our professional resume optimization tool." />
+  <meta name="twitter:image" content="https://www.fixrez.com/fixrez-icon.svg" />
+  <meta name="theme-color" content="#ffffff" />
 
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="FixRez AI - Professional Resume Optimization Tool" />
-    <meta name="twitter:description"
-      content="FixRez AI helps job seekers optimize resumes with advanced AI technology. Get past ATS systems and land more interviews with our professional resume optimization tool." />
-    <meta name="twitter:image" content="https://www.fixrez.com/fixrez-icon.svg" />
-    <meta name="theme-color" content="#ffffff" />
-
-    <!-- Analytics initialized in production via src/lib/analytics.ts -->
-    <!-- Structured Data -->
-    <script type="application/ld+json">
+  <!-- Analytics initialized in production via src/lib/analytics.ts -->
+  <!-- Structured Data -->
+  <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "Organization",
@@ -72,7 +64,7 @@
         }
       }
     </script>
-    <script type="application/ld+json">
+  <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "WebSite",
@@ -85,13 +77,13 @@
         }
       }
     </script>
-    <script type="application/ld+json">
+  <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "FixRez AI",
         "description": "AI-powered resume optimization tool that helps job seekers create ATS-friendly resumes",
-        "url": "https://fixrez.ai/",
+        "url": "https://www.fixrez.com/",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Web, iOS, Android",
         "offers": {
@@ -121,7 +113,7 @@
         ]
       }
     </script>
-    <script type="application/ld+json">
+  <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "FAQPage",
@@ -153,31 +145,31 @@
         ]
       }
     </script>
-    <script type="module">
-      if (import.meta.hot?.on) {
-        import.meta.hot.on('vite:error', (error) => {
-          if (error.err) {
-            console.error(
-              [error.err.message, error.err.frame].filter(Boolean).join('\n'),
-            )
-          }
-        })
-      }
-    </script>
-    <!-- Set API base: localhost API in dev, same-origin in prod -->
-    <script>
-      (function () {
-        var host = window.location.hostname;
-        var isLocal = host === 'localhost' || host === '127.0.0.1';
-        // In local dev, explicitly point to local API server to avoid CORS
-        if (isLocal) {
-          window.__VITE_API_BASE_URL = 'http://localhost:3003/api';
-        } else {
-          window.__VITE_API_BASE_URL = window.location.origin + '/api';
+  <script type="module">
+    if (import.meta.hot?.on) {
+      import.meta.hot.on('vite:error', (error) => {
+        if (error.err) {
+          console.error(
+            [error.err.message, error.err.frame].filter(Boolean).join('\n'),
+          )
         }
-      })();
-    </script>
-  </head>
+      })
+    }
+  </script>
+  <!-- Set API base: localhost API in dev, same-origin in prod -->
+  <script>
+    (function () {
+      var host = window.location.hostname;
+      var isLocal = host === 'localhost' || host === '127.0.0.1';
+      // In local dev, explicitly point to local API server to avoid CORS
+      if (isLocal) {
+        window.__VITE_API_BASE_URL = 'http://localhost:3003/api';
+      } else {
+        window.__VITE_API_BASE_URL = window.location.origin + '/api';
+      }
+    })();
+  </script>
+</head>
 
 <body>
   <h1 style="display:none;">FixRez AI - Professional Resume Optimization Tool</h1>
