@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { getApiBase } from '@/lib/http'
 import { Eye, EyeOff, CheckCircle } from 'lucide-react'
 import { validatePassword, generateStrongPassword } from '@/lib/password'
+import SocialAuthButtons from './SocialAuthButtons'
 
 interface RegisterFormProps {
   onToggle?: () => void
@@ -152,6 +153,8 @@ export default function RegisterForm({ onToggle }: RegisterFormProps) {
           {success}
         </div>
       )}
+
+      <SocialAuthButtons mode="register" />
 
       <form onSubmit={handleRegister} className="space-y-4" aria-label="Registration form">
 

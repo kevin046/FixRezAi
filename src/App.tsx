@@ -20,6 +20,7 @@ import ATSRatingPage from './pages/ATSRatingPage'
 import SitemapPage from './pages/SitemapPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import OAuthConsentPage from './pages/OAuthConsentPage'
 import { Toaster } from 'sonner'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import Footer from '@/components/Footer'
@@ -31,7 +32,7 @@ function App() {
   const { user, setUser, setVerificationStatus, logout, verificationStatus, verificationLoaded, fetchVerificationStatus } = useAuthStore()
 
   // Check URL path to determine initial view
-  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword' => {
+  const getInitialView = (): 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword' | 'oauthConsent' => {
     const path = window.location.pathname
     if (path === '/optimize') return 'wizard'
     if (path === '/terms') return 'terms'
@@ -48,14 +49,15 @@ function App() {
     if (path === '/ats-rating') return 'atsRating'
     if (path === '/forgot-password') return 'forgotPassword'
     if (path === '/reset-password') return 'resetPassword'
+    if (path === '/oauth/consent') return 'oauthConsent'
     return 'home'
   }
 
-  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword'>(
+  const [currentView, setCurrentView] = useState<'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword' | 'oauthConsent'>(
     getInitialView()
   )
 
-  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword') => {
+  const handleNavigation = (view: 'home' | 'wizard' | 'terms' | 'privacy' | 'auth' | 'contact' | 'settings' | 'verify' | 'dashboard' | 'adminMetrics' | 'accessibility' | 'security' | 'atsRating' | 'sitemap' | 'forgotPassword' | 'resetPassword' | 'oauthConsent') => {
     if (view === 'wizard' && user && !isVerified(user)) {
       view = 'verify'
     }
@@ -80,6 +82,7 @@ function App() {
     else if (view === 'atsRating') path = '/ats-rating'
     else if (view === 'forgotPassword') path = '/forgot-password'
     else if (view === 'resetPassword') path = '/reset-password'
+    else if (view === 'oauthConsent') path = '/oauth/consent'
     window.history.pushState({}, '', path)
   }
 
@@ -257,6 +260,8 @@ function App() {
         return <ForgotPasswordPage />
       case 'resetPassword':
         return <ResetPasswordPage />
+      case 'oauthConsent':
+        return <OAuthConsentPage />
       default:
         return <Hero onGetStarted={handleGetStarted} user={user} onLogout={handleLogout} />
     }

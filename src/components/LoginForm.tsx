@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Eye, EyeOff, Mail, Lock, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import SocialAuthButtons from './SocialAuthButtons'
 import { useAuthStore } from '@/stores/authStore'
 import { isVerified, resendVerification } from '@/lib/auth'
 import { getApiBase } from '@/lib/http'
@@ -129,15 +130,15 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
       setError('Please enter your email address first.')
       return
     }
-    
+
     setResendLoading(true)
     setResendSuccess('')
     setError('')
-    
+
     try {
       // This requires the user to be authenticated
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         setError('You must be logged in to use this feature.')
         return
@@ -145,11 +146,11 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
 
       // Use Supabase's reauthenticate method
       const { error: reauthError } = await supabase.auth.reauthenticate()
-      
+
       if (reauthError) {
         throw reauthError
       }
-      
+
       setResendSuccess('Verification email sent! Please check your inbox.')
       setShowResendOption(false)
     } catch (err) {
@@ -187,6 +188,8 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
           {resendSuccess}
         </div>
       )}
+
+      <SocialAuthButtons mode="login" />
 
       <form onSubmit={handleLogin} className="space-y-4">
         <div>
@@ -287,19 +290,19 @@ export default function LoginForm({ onToggle }: LoginFormProps) {
                   {resendLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   {resendLoading ? 'Sending...' : 'Resend verification email'}
                 </button>
-                
+
                 {resendAttemptsRemaining !== undefined && resendAttemptsRemaining > 0 && (
                   <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
                     {resendAttemptsRemaining} verification attempt{resendAttemptsRemaining !== 1 ? 's' : ''} remaining
                   </div>
                 )}
-                
+
                 {resendAttemptsRemaining === 0 && (
                   <div className="text-xs text-red-500 dark:text-red-400 text-center">
                     No verification attempts remaining. Please contact support.
                   </div>
                 )}
-                
+
                 <button
                   type="button"
                   onClick={handleClearResendOption}
